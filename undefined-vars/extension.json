@@ -1,0 +1,22 @@
+{
+  "id": "tcode.undefinedvars",
+  "name": "Undefined Variables",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.undefinedvars.check",
+        "title": "Check undefined variables",
+        "script": "main.lua",
+        "fn": "check"
+      }
+    ],
+    "keybindings": [
+      { "key": "alt+shift+v", "command": "tcode.undefinedvars.check" }
+    ],
+    "hooks": [
+      { "event": "onDidSaveBuffer", "command": "tcode.undefinedvars.check" }
+    ]
+  }
+}

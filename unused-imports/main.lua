@@ -1,0 +1,692 @@
+-- Unused Imports for tcode (id: tcode.unusedimports)
+-- Import bindings collected and never used for go/js/ts/py. Severity
+-- "warning". Imports are per-file: no cross-file analysis needed.
+--
+-- Editor API: tcode.buffer(), tcode.message(), tcode.diagnostics.set/clear
+-- (per-provider: replaces only this extension's diagnostics; the editor
+-- merges with Error Detector / Undefined Variables).
+--
+-- check is GLOBAL on purpose: the backend resolves the function by name.
+-- Convention: every message sent to the user is English.
+-- RAM: language tables build lazily (only on the first file of that
+-- language); no undefined-variable findings and no balance scanner here.
+
+local function set(words)
+  local t = {}
+  for w in words:gmatch("%S+") do t[w] = true end
+  return t
+end
+
+local function langTable(lang)
+  if lang == "go" then
+    return {
+      lineComment = "//", blockComment = { "/*", "*/" },
+      keywords = set("break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var"),
+      builtins = set("nil true false iota append cap close complex copy delete imag len make new panic print println real recover error string int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 uintptr float32 float64 bool byte rune any"),
+    }
+  elseif lang == "js" then
+    return {
+      lineComment = "//", blockComment = { "/*", "*/" },
+      keywords = set("break case catch class const continue debugger default delete do else export extends finally for function if import in instanceof let new of return super switch this throw try typeof var void while with yield async await from as static get set"),
+      builtins = set("undefined null true false NaN Infinity console window document process require module exports globalThis fetch JSON Math Object Array String Number Boolean Symbol Function Promise Error Date RegExp Map Set WeakMap WeakSet Proxy Reflect parseInt parseFloat isNaN setTimeout setInterval clearTimeout clearInterval localStorage"),
+    }
+  elseif lang == "ts" then -- Angular rides on ts rules.
+    return {
+      lineComment = "//", blockComment = { "/*", "*/" },
+      keywords = set("break case catch class const continue debugger default delete do else enum export extends finally for function if import in instanceof let new of return super switch this throw try typeof var void while with yield async await from as static get set type interface implements readonly abstract namespace declare is keyof infer"),
+      builtins = set("undefined null true false NaN Infinity console window document process require module exports globalThis fetch JSON Math Object Array String Number Boolean Symbol Function Promise Error Date RegExp Map Set WeakMap WeakSet Proxy Reflect parseInt parseFloat isNaN setTimeout setInterval clearTimeout clearInterval localStorage any unknown never string number boolean object Record Partial Readonly"),
+    }
+  elseif lang == "py" then
+    return {
+      lineComment = "#", blockComment = false,
+      keywords = set("and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield"),
+      builtins = set("True False None len range print str int float bool list dict set tuple type isinstance enumerate zip map filter sorted sum min max abs any all open input repr format round divmod hash id object property classmethod staticmethod super self Exception ValueError TypeError KeyError IndexError NameError RuntimeError"),
+    }
+  end
+  return nil
+end
+
+local builtTables = {}
+local function cfgFor(lang)
+  if not builtTables[lang] then
+    local c = langTable(lang)
+    if c then
+      c.lang = lang
+      builtTables[lang] = c
+    end
+  end
+  return builtTables[lang]
+end
+
+local function detectLanguage(path)
+  if not path then return nil end
+  local p = string.lower(path)
+  if p:match("%.go$") then return "go" end
+  if p:match("%.m?jsx?$") or p:match("%.m?tsx?$") then return "ts" end
+  if p:match("%.py$") then return "py" end
+  return nil
+end
+
+local function scan(content, cfg)
+  local toks = {}
+  local line = 1
+  local n = #content
+  local i = 1
+  local syms = {
+    ["("] = true, [")"] = true, ["["] = true, ["]"] = true, ["{"] = true,
+    ["}"] = true, ["."] = true, [","] = true, [":"] = true, ["="] = true,
+    [";"] = true, ["+"] = true, [">"] = true,
+  }
+  local function push(t, w)
+    toks[#toks + 1] = { t = t, w = w, line = line }
+  end
+  while i <= n do
+    local c = content:sub(i, i)
+    if c == "\n" then
+      push("nl", "")
+      line = line + 1
+      i = i + 1
+    elseif cfg.lineComment and content:sub(i, i + #cfg.lineComment - 1) == cfg.lineComment then
+      local e = content:find("\n", i, true)
+      i = e or (n + 1)
+    elseif cfg.blockComment and content:sub(i, i + #cfg.blockComment[1] - 1) == cfg.blockComment[1] then
+      local s = i
+      local e = content:find(cfg.blockComment[2], i + #cfg.blockComment[1], true)
+      local seg = content:sub(s, e and (e + #cfg.blockComment[2] - 1) or n)
+      for _ in seg:gmatch("\n") do line = line + 1 end
+      i = (e and e + #cfg.blockComment[2]) or (n + 1)
+    elseif c == '"' or c == "'" or c == "`" then
+      local quote = c
+      local triple = false
+      if (quote == '"' or quote == "'") and content:sub(i, i + 2) == quote .. quote .. quote then
+        triple = true
+      end
+      local j = i + (triple and 3 or 1)
+      local closed = false
+      while j <= n do
+        local sc = content:sub(j, j)
+        if sc == "\\" then
+          j = j + 2
+        elseif sc == "\n" then
+          line = line + 1
+          j = j + 1
+        elseif (triple and content:sub(j, j + 2) == quote .. quote .. quote)
+          or (not triple and sc == quote) then
+          closed = true
+          break
+        else
+          j = j + 1
+        end
+      end
+      if closed then
+        push("str", content:sub(i + (triple and 3 or 1), j - 1))
+        i = j + (triple and 3 or 1)
+      else
+        push("str", content:sub(i + (triple and 3 or 1), n))
+        i = n + 1
+      end
+    else
+      local b = c:byte()
+      if b and ((b >= 97 and b <= 122) or (b >= 65 and b <= 90) or c == "_") then
+        local j = i + 1
+        while j <= n do
+          local nb = content:sub(j, j):byte()
+          if nb and ((nb >= 97 and nb <= 122) or (nb >= 65 and nb <= 90)
+            or (nb >= 48 and nb <= 57) or content:sub(j, j) == "_") then
+            j = j + 1
+          else
+            break
+          end
+        end
+        push("id", content:sub(i, j - 1))
+        i = j
+      elseif syms[c] then
+        push("sym", c)
+        i = i + 1
+      else
+        i = i + 1
+      end
+    end
+  end
+  return toks
+end
+
+-- --- Import tracking (go/js/ts/py): collect + mark usage + unused at EOF ---
+
+local function analyzeImports(toks, cfg)
+  local findings = {}
+  local global = {}
+  local stack = { global }
+  local importBy = {}           -- name -> { line, used }
+  local wildcard = false        -- go `import . "x"`: names inject, no track
+  local pendingParams = nil
+  local i, n = 1, #toks
+
+  local function isSym(j, ch)
+    local t = toks[j]
+    return t and t.t == "sym" and t.w == ch
+  end
+  local function isId(j)
+    local t = toks[j]
+    return t and t.t == "id"
+  end
+  local function cur()
+    return stack[#stack]
+  end
+  local function define(name)
+    if name and name ~= "" and not cfg.keywords[name] and not cfg.builtins[name] then
+      cur()[name] = true
+    end
+  end
+  local function defineImport(name, line)
+    if not name or name == "" then return end
+    if cfg.keywords[name] or cfg.builtins[name] or name == "_" then return end
+    global[name] = true
+    if not importBy[name] then
+      importBy[name] = { line = line, used = false }
+    end
+  end
+  local function defined(name)
+    for k = #stack, 1, -1 do
+      if stack[k][name] then return true end
+    end
+    return false
+  end
+  local function markUsed(name)
+    local r = importBy[name]
+    if r then r.used = true end
+  end
+  local function readGroup(list, j, openCh, closeCh)
+    local ids = {}
+    local depth = 1
+    local k = j + 1
+    while list[k] do
+      local t = list[k]
+      if t.t == "sym" then
+        if t.w == openCh then
+          depth = depth + 1
+        elseif t.w == closeCh then
+          depth = depth - 1
+          if depth == 0 then return ids, k end
+        end
+      elseif t.t == "id" then
+        ids[#ids + 1] = t.w
+      end
+      k = k + 1
+    end
+    return ids, k - 1
+  end
+  local function definePendingParams()
+    if pendingParams then
+      for _, p in ipairs(pendingParams) do
+        if not cfg.keywords[p] and not cfg.builtins[p] then
+          cur()[p] = true
+          markUsed(p) -- TS param type annotations use imported types too
+        end
+      end
+      pendingParams = nil
+    end
+  end
+
+  local function handleGo(tok, j)
+    local w = tok.w
+    if w == "func" then
+      local k = j + 1
+      local ids, endj
+      local params = {}
+      if isSym(k, "(") then
+        ids, endj = readGroup(toks, k, "(", ")")
+        for _, rn in ipairs(ids) do params[#params + 1] = rn end
+        k = endj + 1
+      end
+      if isId(k) then
+        define(toks[k].w)
+        k = k + 1
+      end
+      if isSym(k, "(") then
+        ids, endj = readGroup(toks, k, "(", ")")
+        for _, p in ipairs(ids) do params[#params + 1] = p end
+        k = endj + 1
+        if isSym(k, "(") then
+          local rids
+          rids, endj = readGroup(toks, k, "(", ")")
+          for _, rn in ipairs(rids) do params[#params + 1] = rn end
+          k = endj + 1
+        elseif isId(k) then
+          k = k + 1
+        end
+      end
+      pendingParams = params
+      return k
+    elseif w == "package" then
+      return j + 2
+    elseif w == "import" then
+      local k = j + 1
+      if isSym(k, "(") then
+        local _, endj = readGroup(toks, k, "(", ")")
+        local g = k + 1
+        local prevId
+        local dotNext = false
+        while g < endj do
+          local t = toks[g]
+          if t.t == "id" then
+            prevId = t.w
+          elseif t.t == "str" then
+            if prevId then
+              defineImport(prevId, tok.line)
+            elseif not dotNext then
+              local base = t.w:match("([^/]+)$") or t.w
+              if base == "." then
+                wildcard = true
+              else
+                defineImport(base, tok.line)
+              end
+            end
+            prevId = nil
+            dotNext = false
+          elseif t.t == "sym" and t.w == "." then
+            wildcard = true
+            dotNext = true
+          end
+          g = g + 1
+        end
+        return endj + 1
+      end
+      if isId(k) then
+        defineImport(toks[k].w, tok.line)
+        return j + 3
+      end
+      if toks[k] and toks[k].t == "sym" and toks[k].w == "." then
+        wildcard = true
+        return j + 3
+      end
+      if toks[k] and toks[k].t == "str" then
+        local base = toks[k].w:match("([^/]+)$") or toks[k].w
+        if base == "." then
+          wildcard = true
+        else
+          defineImport(base, tok.line)
+        end
+        return j + 1
+      end
+      return j + 1
+    elseif w == "var" or w == "const" or w == "type" then
+      local k = j + 1
+      if isSym(k, "(") then
+        local ids, endj = readGroup(toks, k, "(", ")")
+        for _, v in ipairs(ids) do define(v) end
+        return endj + 1
+      end
+      while isId(k) do
+        define(toks[k].w)
+        k = k + 1
+        if isSym(k, ",") then k = k + 1 end
+      end
+      return k
+    end
+    return j + 1
+  end
+
+  local function handleJS(tok, j)
+    local w = tok.w
+    if w == "function" then
+      local k = j + 1
+      local ids, endj
+      if isId(k) then
+        define(toks[k].w)
+        k = k + 1
+      end
+      if isSym(k, "(") then
+        ids, endj = readGroup(toks, k, "(", ")")
+        pendingParams = ids
+        k = endj + 1
+      end
+      return k
+    elseif w == "class" then
+      local k = j + 1
+      if isId(k) then
+        define(toks[k].w)
+      end
+      return j + 2
+    elseif w == "type" or w == "interface" then
+      if isId(j + 1) then define(toks[j + 1].w) end
+      return j + 2
+    elseif w == "let" or w == "const" or w == "var" then
+      local k = j + 1
+      local depth = 0
+      local skipType = false
+      while toks[k] do
+        local t = toks[k]
+        if t.t == "sym" then
+          if t.w == "=" then break end
+          if t.w == "{" or t.w == "[" then depth = depth + 1 end
+          if t.w == "}" or t.w == "]" then depth = math.max(depth - 1, 0) end
+          if t.w == ":" and depth == 0 then
+            skipType = true -- TS annotation: let c: Config = ... (markUsed
+            -- fires on the annotation id below)
+          end
+          if t.w == ";" and depth == 0 then break end
+        elseif t.t == "id" then
+          if skipType then
+            markUsed(t.w)
+            skipType = false
+          elseif not cfg.keywords[t.w] then
+            define(t.w)
+          end
+        elseif t.t == "nl" and depth == 0 then
+          break
+        end
+        k = k + 1
+      end
+      return k
+    elseif w == "import" then
+      local k = j + 1
+      local depth = 0
+      while toks[k] do
+        local t = toks[k]
+        if t.t == "sym" then
+          if t.w == "{" or t.w == "[" then
+            depth = depth + 1
+          elseif t.w == "}" or t.w == "]" then
+            depth = math.max(depth - 1, 0)
+          elseif t.w == ";" and depth == 0 then
+            break
+          end
+        elseif t.t == "id" then
+          if not (t.w == "as" or t.w == "type" or (t.w == "from" and depth == 0)) then
+            defineImport(t.w, tok.line)
+          end
+        elseif t.t == "str" then
+          if depth == 0 then break end
+        elseif t.t == "nl" and depth == 0 then
+          break
+        end
+        k = k + 1
+      end
+      return k
+    end
+    return j + 1
+  end
+
+  local function handlePy(tok, j)
+    local w = tok.w
+    if w == "def" then
+      local k = j + 1
+      if isId(k) then
+        define(toks[k].w)
+        k = k + 1
+      end
+      if isSym(k, "(") then
+        local ids, endj = readGroup(toks, k, "(", ")")
+        for _, p in ipairs(ids) do define(p) end
+        k = endj + 1
+      end
+      return k
+    elseif w == "class" then
+      local k = j + 1
+      if isId(k) then
+        define(toks[k].w)
+      end
+      return j + 2
+    elseif w == "import" then
+      local k = j + 1
+      while toks[k] do
+        local t = toks[k]
+        if t.t == "id" then
+          if t.w == "as" then
+            if isId(k + 1) then defineImport(toks[k + 1].w, tok.line) end
+            k = k + 2
+          else
+            defineImport(t.w, tok.line)
+            k = k + 1
+          end
+        elseif t.t == "sym" and t.w == "." then
+          k = k + 1
+        elseif t.t == "nl" then
+          break
+        else
+          break
+        end
+      end
+      return k
+    elseif w == "from" then
+      local k = j + 1
+      while toks[k] and not (toks[k].t == "id" and toks[k].w == "import") do
+        if toks[k].t == "nl" then return k end
+        k = k + 1
+      end
+      k = k + 1
+      while toks[k] do
+        local t = toks[k]
+        if t.t == "str" or t.t == "nl" then break end
+        if t.t == "id" then
+          if t.w == "as" then
+            if isId(k + 1) then defineImport(toks[k + 1].w, tok.line) end
+            k = k + 2
+          else
+            defineImport(t.w, tok.line)
+            k = k + 1
+          end
+        elseif t.t == "sym" and t.w == "," then
+          k = k + 1
+        else
+          break
+        end
+      end
+      return k
+    elseif w == "lambda" then
+      local k = j + 1
+      while toks[k] and not (toks[k].t == "sym" and toks[k].w == ":") do
+        if toks[k].t == "id" then define(toks[k].w) end
+        if toks[k].t == "nl" then break end
+        k = k + 1
+      end
+      return k
+    elseif w == "for" then
+      local k = j + 1
+      while toks[k] and not (toks[k].t == "id" and toks[k].w == "in") do
+        if toks[k].t == "id" and not cfg.keywords[toks[k].w] then
+          define(toks[k].w)
+        end
+        if toks[k].t == "nl" then break end
+        k = k + 1
+      end
+      return k
+    elseif w == "as" then
+      if isId(j + 1) then define(toks[j + 1].w) end
+      return j + 2
+    end
+    return j + 1
+  end
+
+  while i <= n do
+    local tok = toks[i]
+    if tok.t == "id" then
+      local w = tok.w
+      if w == "_" then
+        i = i + 1
+      elseif cfg.keywords[w] then
+        if cfg.lang == "go" then
+          i = handleGo(tok, i)
+        elseif cfg.lang == "js" or cfg.lang == "ts" then
+          i = handleJS(tok, i)
+        else
+          i = handlePy(tok, i)
+        end
+      elseif cfg.builtins[w] then
+        if isSym(i + 1, ".") then
+          i = i + 1
+          while isSym(i, ".") and isId(i + 1) do
+            i = i + 2
+          end
+        else
+          i = i + 1
+        end
+      elseif (cfg.lang == "go" or cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, ":") then
+        markUsed(w) -- annotations and x := still USE the imported type
+        i = i + 1
+      elseif isSym(i + 1, ",") then
+        local j = i + 1
+        local stopsAtDecl = false
+        while toks[j] do
+          local t = toks[j]
+          if t.t == "id" then
+            j = j + 1
+          elseif t.t == "sym" then
+            if t.w == "," then
+              j = j + 1
+            else
+              stopsAtDecl = (t.w == ":" and isSym(j + 1, "="))
+                or (cfg.lang == "py" and t.w == "=" and not isSym(j + 1, ">"))
+              break
+            end
+          else
+            break
+          end
+        end
+        if stopsAtDecl then
+          i = i + 1
+        else
+          if defined(w) then markUsed(w) end
+          i = i + 1
+        end
+      elseif (cfg.lang == "py" or cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, "=") then
+        if cfg.lang == "py" then
+          define(w)
+        elseif isSym(i + 2, ">") then
+          local p = toks[i - 1]
+          if p == nil
+            or (p.t == "sym" and (p.w == "=" or p.w == "(" or p.w == ","
+              or p.w == "[" or p.w == "{"))
+            or (p.t == "id" and cfg.keywords[p.w]) then
+            define(w)
+          end
+        else
+          define(w)
+        end
+        i = i + 1
+      elseif isSym(i - 1, ":") then
+        markUsed(w) -- return/annotation types
+        i = i + 1
+      elseif isSym(i - 1, ".") then
+        i = i + 1 -- member selector after an expression: never the binding
+      elseif isSym(i + 1, ".") then
+        if defined(w) then markUsed(w) end
+        i = i + 1
+        while isSym(i, ".") and isId(i + 1) do
+          i = i + 2
+        end
+      else
+        if defined(w) then markUsed(w) end
+        i = i + 1
+      end
+    elseif tok.t == "nl" then
+      i = i + 1
+    elseif tok.t == "sym" then
+      if tok.w == "{" then
+        stack[#stack + 1] = {}
+        definePendingParams()
+        i = i + 1
+      elseif tok.w == "}" then
+        if #stack > 1 then stack[#stack] = nil end
+        i = i + 1
+      elseif tok.w == "(" then
+        if cfg.lang == "js" or cfg.lang == "ts" then
+          local ids, endj = readGroup(toks, i, "(", ")")
+          if isSym(endj + 1, "=") and isSym(endj + 2, ">") then
+            for _, p in ipairs(ids) do define(p) end
+          end
+        end
+        i = i + 1
+      elseif tok.w == "=" then
+        if cfg.lang == "py" then
+          local k = i - 1
+          while k >= 1 do
+            local t = toks[k]
+            if t.t == "id" then
+              define(t.w)
+              k = k - 1
+            elseif t.t == "sym" and t.w == "," then
+              k = k - 1
+            else
+              break
+            end
+          end
+          local nx = toks[i + 1]
+          if nx and nx.t == "id" and isSym(i + 2, "=") then
+            define(nx.w)
+          end
+        elseif cfg.lang == "go" and isSym(i - 1, ":") then
+          local k = i - 2
+          while k >= 1 do
+            local t = toks[k]
+            if t.t == "id" then
+              define(t.w)
+              k = k - 1
+            elseif t.t == "sym" and t.w == "," then
+              k = k - 1
+            else
+              break
+            end
+          end
+        elseif (cfg.lang == "js" or cfg.lang == "ts") then
+          if isSym(i + 1, ">") then
+            if isId(i - 1) and not cfg.keywords[toks[i - 1].w] then
+              define(toks[i - 1].w)
+            end
+          else
+            if isId(i - 1) and not cfg.keywords[toks[i - 1].w] then
+              define(toks[i - 1].w)
+            end
+          end
+        end
+        i = i + 1
+      else
+        i = i + 1
+      end
+    else
+      i = i + 1
+    end
+  end
+
+  -- Unused imports, checked once at EOF.
+  for name, rec in pairs(importBy) do
+    if not rec.used then
+      findings[#findings + 1] = { line = rec.line, msg = "unused import '" .. name .. "'" }
+    end
+  end
+  return findings
+end
+
+-- --- Orchestration ---------------------------------------------------------
+
+function check()
+  local path, content = tcode.buffer()
+  if not path then
+    tcode.message("Unused Imports: no active buffer")
+    return
+  end
+
+  local diags = {}
+  local lang = detectLanguage(path)
+  if lang then
+    local cfg = cfgFor(lang)
+    if cfg then
+      local findings = analyzeImports(scan(content, cfg), cfg)
+      for _, f in ipairs(findings) do
+        diags[#diags + 1] = { line = f.line, message = f.msg, severity = "warning" }
+      end
+    end
+  end
+
+  local nerr = #diags
+  if nerr == 0 then
+    tcode.diagnostics.clear()
+    tcode.message("Unused Imports: no issues found")
+    return
+  end
+  tcode.diagnostics.set(diags)
+  local noun = "issue"
+  if nerr > 1 then noun = "issues" end
+  tcode.message("Unused Imports: " .. nerr .. " " .. noun)
+end

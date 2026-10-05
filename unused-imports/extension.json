@@ -1,0 +1,22 @@
+{
+  "id": "tcode.unusedimports",
+  "name": "Unused Imports",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.unusedimports.check",
+        "title": "Check unused imports",
+        "script": "main.lua",
+        "fn": "check"
+      }
+    ],
+    "keybindings": [
+      { "key": "alt+shift+i", "command": "tcode.unusedimports.check" }
+    ],
+    "hooks": [
+      { "event": "onDidSaveBuffer", "command": "tcode.unusedimports.check" }
+    ]
+  }
+}
