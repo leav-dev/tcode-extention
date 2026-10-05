@@ -664,6 +664,41 @@ local function analyzeScope(toks, cfg)
       elseif (cfg.lang == "go" or cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, ":") then
         -- go: x := ...; js/ts: {key: v} or annotation: not a usage
         i = i + 1
+      elseif isSym(i + 1, ",") then
+        -- Comma-chain: either a multi-target declaration (go `a, b := x`,
+        -- py `a, b = x`) or call args / comma operator (fn(a, b) — always
+        -- usages). Walk the chain; skip the usage check only when it ends
+        -- at the declaration marker (:= for go, = for py). The '=' handler
+        -- defines every id of the chain.
+        local j = i + 1
+        local stopsAtDecl = false
+        while toks[j] do
+          local t = toks[j]
+          if t.t == "id" then
+            j = j + 1
+          elseif t.t == "sym" then
+            if t.w == "," then
+              j = j + 1
+            else
+              stopsAtDecl = (t.w == ":" and isSym(j + 1, "="))
+                or (cfg.lang == "py" and t.w == "=" and not isSym(j + 1, ">"))
+              break
+            end
+          else
+            break
+          end
+        end
+        if stopsAtDecl then
+          i = i + 1 -- defined by the '=' handler below
+        else
+          -- real usage (call args, commas in expressions)
+          if defined(w) or wildcard then
+            markUsed(w)
+          else
+            findings[#findings + 1] = { line = tok.line, msg = "undefined '" .. w .. "'" }
+          end
+          i = i + 1
+        end
       elseif (cfg.lang == "py" or cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, "=") then
         -- Assignment defines: py defines on any '=', js/ts v1 treats a plain
         -- assignment as an implicit definition (documented). go keeps the
