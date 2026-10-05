@@ -280,6 +280,52 @@ local function analyzeScope(toks, cfg)
     end
   end
 
+  -- Go: package-level names are visible file-wide regardless of declaration
+  -- order (var x = helper() before func helper() is valid). Pre-scan the
+  -- top-level (brace depth 0) declarations into global so a use before the
+  -- declaration is not a false positive. Cross-file package members are
+  -- still invisible: the host only exposes the active buffer (no io/os in
+  -- the script) — a workspace/package-symbols editor API would close that.
+  local function preScanPackageLevel()
+    local depth = 0
+    local j = 1
+    while j <= n do
+      local t = toks[j]
+      if t.t == "sym" then
+        if t.w == "{" then
+          depth = depth + 1
+        elseif t.w == "}" then
+          depth = math.max(depth - 1, 0)
+        end
+      elseif t.t == "id" and depth == 0 then
+        local w = t.w
+        if w == "func" then
+          local k = j + 1
+          if isSym(k, "(") then -- receiver group: func (r *T) M(...)
+            local _, endj = readGroup(k, "(", ")")
+            k = endj + 1
+          end
+          if isId(k) then -- named function (or method) at package level
+            define(toks[k].w)
+          end
+        elseif w == "var" or w == "const" or w == "type" then
+          local k = j + 1
+          if isSym(k, "(") then -- block form: var ( ... )
+            local ids, endj = readGroup(k, "(", ")")
+            for _, v in ipairs(ids) do define(v) end
+          else
+            while isId(k) do
+              define(toks[k].w)
+              k = k + 1
+              if isSym(k, ",") then k = k + 1 end
+            end
+          end
+        end
+      end
+      j = j + 1
+    end
+  end
+
   local function handleGo(tok, j)
     local w = tok.w
     if w == "func" then
@@ -542,6 +588,10 @@ local function analyzeScope(toks, cfg)
       return j + 2
     end
     return j + 1
+  end
+
+  if cfg.lang == "go" then
+    preScanPackageLevel()
   end
 
   while i <= n do
