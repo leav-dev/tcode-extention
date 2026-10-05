@@ -1,10 +1,9 @@
 # Git Changes
 
-Extensión para tcode que muestra información de cambios de git en la barra de estado y marca las líneas con cambios en el gutter.
+Extensión para tcode que marca las líneas con cambios en el gutter. No escribe en la barra de estado.
 
 ## Características
 
-- **Barra de estado**: Muestra cantidad de archivos con cambios (staged, unstaged, untracked) y líneas agregadas/borradas
 - **Gutter**: Marca líneas agregadas (`i` = info), borradas (`?` = warning) y modificadas (`~` = info)
 - **Auto-actualización**: Se actualiza automáticamente al guardar el buffer
 
@@ -20,23 +19,14 @@ tcode --install-extension <path>/tcode-extentions/git-changes
 
 | Comando | Descripción | Keybinding |
 |---------|-------------|------------|
-| `tcode.gitchanges.status` | Muestra resumen en barra de estado | `alt+shift+g` |
 | `tcode.gitchanges.mark` | Marca líneas con cambios en gutter | `alt+shift+m` |
 
 ### Hooks
 
-- `onDidSaveBuffer`: Ejecuta `status` automáticamente al guardar
+- `onDidSaveBuffer`: Ejecuta `mark` automáticamente al guardar
 
-## Formato de mensajes
+## Gutter
 
-**Barra de estado:**
-```
-Git Changes: 3 files (1 staged, 2 unstaged), +15 -8 lines
-Git Changes: clean working tree
-Git Changes: not a git repository
-```
-
-**Gutter:**
 - `i` (info): Línea agregada o modificada
 - `?` (warning): Línea borrada
 
@@ -47,7 +37,5 @@ Git Changes: not a git repository
 
 ## API utilizada
 
-- `tcode.git.status()`: Información de archivos y líneas con cambios
 - `tcode.git.file_diff(path, staged)`: Diff de un archivo específico
 - `tcode.diagnostics.set()`: Marcar líneas en el gutter
-- `tcode.message()`: Mostrar mensajes en barra de estado

@@ -1,16 +1,10 @@
 {
   "id": "tcode.gitchanges",
   "name": "Git Changes",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "activation": ["onStartup"],
   "contributes": {
     "commands": [
-      {
-        "id": "tcode.gitchanges.status",
-        "title": "Show git changes summary",
-        "script": "main.lua",
-        "fn": "status"
-      },
       {
         "id": "tcode.gitchanges.mark",
         "title": "Mark changed lines in gutter",
@@ -19,11 +13,10 @@
       }
     ],
     "keybindings": [
-      { "key": "alt+shift+g", "command": "tcode.gitchanges.status" },
       { "key": "alt+shift+m", "command": "tcode.gitchanges.mark" }
     ],
     "hooks": [
-      { "event": "onDidSaveBuffer", "command": "tcode.gitchanges.status" }
+      { "event": "onDidSaveBuffer", "command": "tcode.gitchanges.mark" }
     ]
   }
 }
