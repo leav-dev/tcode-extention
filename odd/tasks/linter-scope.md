@@ -149,3 +149,23 @@ autor-locales por extensión: el monorepo había roto el install local, que
 exige carpeta con .git). Reinstalado: Code Linter v1.1.1. Harness: 10
 casos todos correctos (user-exact, block-used/unused/alias/blank/dot,
 single-line, js console.log, py from).
+
+## Fix posterior: visibilidad de nivel de paquete en Go (v1.1.2)
+
+Reporte del usuario: "no me detecta cuando algo está dentro del mismo
+package". En Go los nombres de paquete son visibles en TODO el archivo sin
+importar el orden (`var x = helper()` antes que `func helper()` es válido);
+el analizador resolvía en orden de aparición → falsos "undefined 'helper'".
+
+Fix: pre-scan de nivel de paquete (brace depth 0) que registra en la scope
+global funcs, métodos (con receiver) y var/const/type (single + bloque)
+ANTES del pase secuencial. Los usos en funciones siguen con semántica
+before-use (correcto para bloques).
+
+LIMITE HONESTO (documentado): entre ARCHIVOS del mismo paquete no se ve —
+el host Lua expone solo el buffer activo y no hay io/os para leer los
+otros archivos. Cerrarlo requiere una API del editor (símbolos del
+workspace/paquete) o pasar el contexto del paquete al script.
+
+Harness: 9 casos OK (use-before-func, main-usos-later, global, var-block,
+método, still-catches-undefined, regressions). Commit `9e2d...`, v1.1.2.
