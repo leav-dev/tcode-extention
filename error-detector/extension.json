@@ -1,0 +1,30 @@
+{
+  "id": "tcode.errordetector",
+  "name": "Code Linter",
+  "version": "1.1.0",
+  "activation": [
+    "onStartup"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.errordetector.check",
+        "title": "Check code",
+        "script": "main.lua",
+        "fn": "check"
+      }
+    ],
+    "keybindings": [
+      {
+        "key": "alt+shift+e",
+        "command": "tcode.errordetector.check"
+      }
+    ],
+    "hooks": [
+      {
+        "event": "onDidSaveBuffer",
+        "command": "tcode.errordetector.check"
+      }
+    ]
+  }
+}

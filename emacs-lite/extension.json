@@ -1,0 +1,16 @@
+{
+  "id": "tcode.emacslite",
+  "name": "Emacs-lite",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [],
+    "keybindings": [
+      { "key": "ctrl+x b", "command": "tcode.switchTabNext" },
+      { "key": "ctrl+x ctrl+f", "command": "tcode.toggleExplorer" },
+      { "key": "ctrl+x k", "command": "tcode.closeTab" },
+      { "key": "ctrl+x u", "command": "tcode.undo" }
+    ],
+    "hooks": []
+  }
+}

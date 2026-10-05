@@ -1,0 +1,17 @@
+{
+  "id": "tcode.vimlite",
+  "name": "Vim-lite",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [],
+    "keybindings": [
+      { "key": "alt+h", "command": "tcode.switchTabPrev" },
+      { "key": "alt+l", "command": "tcode.switchTabNext" },
+      { "key": "alt+e", "command": "tcode.toggleExplorer" },
+      { "key": "alt+w", "command": "tcode.save" },
+      { "key": "alt+shift+w", "command": "tcode.saveAs" }
+    ],
+    "hooks": []
+  }
+}
