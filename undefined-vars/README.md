@@ -16,8 +16,10 @@ tcode --install-extension <path>/undefined-vars
 
 | Trigger | Action |
 | --- | --- |
-| On save (`onDidSaveBuffer`) | Runs `check()` and publishes warnings |
+| On save (`onDidSaveBuffer`) | Runs `check()` and publishes warnings to gutter |
 | `alt+shift+v` | On-demand check |
+
+**Note:** This extension does not write to the status bar. It only publishes diagnostics to the gutter.
 
 Go runs **package-wide**: same-file declarations are order-independent and
 sibling `.go` files of the same `package` clause are scanned via

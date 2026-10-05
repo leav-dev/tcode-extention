@@ -16,8 +16,10 @@ tcode --install-extension <path>/unused-imports
 
 | Trigger | Action |
 | --- | --- |
-| On save (`onDidSaveBuffer`) | Runs `check()` and publishes warnings |
+| On save (`onDidSaveBuffer`) | Runs `check()` and publishes warnings to gutter |
 | `alt+shift+i` | On-demand check |
+
+**Note:** This extension does not write to the status bar. It only publishes diagnostics to the gutter.
 
 ## What counts as "used"
 

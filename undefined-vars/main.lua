@@ -784,7 +784,6 @@ end
 function check()
   local path, content = tcode.buffer()
   if not path then
-    tcode.message("Undefined Variables: no active buffer")
     return
   end
 
@@ -803,11 +802,7 @@ function check()
   local nerr = #diags
   if nerr == 0 then
     tcode.diagnostics.clear()
-    tcode.message("Undefined Variables: no issues found")
     return
   end
   tcode.diagnostics.set(diags)
-  local noun = "issue"
-  if nerr > 1 then noun = "issues" end
-  tcode.message("Undefined Variables: " .. nerr .. " " .. noun)
 end

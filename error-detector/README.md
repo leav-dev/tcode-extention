@@ -16,8 +16,10 @@ tcode --install-extension <path>/error-detector
 
 | Trigger | Action |
 | --- | --- |
-| On save (`onDidSaveBuffer`) | Runs `check()` and publishes errors |
+| On save (`onDidSaveBuffer`) | Runs `check()` and publishes errors to gutter |
 | `alt+shift+e` | On-demand check |
+
+**Note:** This extension does not write to the status bar. It only publishes diagnostics to the gutter.
 
 **Bracket balance:** `'(' never closed`, `'}' without opening`,
 `'X' does not match 'Y'`, `unterminated string (delimiter 'X')`.

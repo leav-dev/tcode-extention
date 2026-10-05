@@ -198,7 +198,6 @@ end
 function check()
   local path, content = tcode.buffer()
   if not path then
-    tcode.message("Error Detector: no active buffer")
     return
   end
 
@@ -215,11 +214,7 @@ function check()
   local nerr = #diags
   if nerr == 0 then
     tcode.diagnostics.clear()
-    tcode.message("Error Detector: no errors")
     return
   end
   tcode.diagnostics.set(diags)
-  local noun = "error"
-  if nerr > 1 then noun = "errors" end
-  tcode.message("Error Detector: " .. nerr .. " " .. noun .. " marked in the gutter")
 end
