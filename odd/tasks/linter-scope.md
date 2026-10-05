@@ -193,3 +193,17 @@ Harness 7/7 (hermano usado limpio; hermano de OTRO paquete no visible;
 global/var + func en hermanos; undefined real; regresiones). v1.2.0
 instalado. El merge multi-proveedor quedó desbloqueado: el lock de app.go
 se liberó y el árbol de tcode volvió a compilar (commit 5ae2647).
+
+## Fix posterior: declaración múltiple (a, b := ) — v1.2.1
+
+Reporte: "var1, var2 :=" marca una de las variables como no definida. El pase
+de ids trataba el primer id de la cadena (seguido de ",") como USO antes de
+que el handler de "=" definiera la cadena → falso `undefined 'var1'`
+(var2 no, porque le sigue ":"). Mismo defecto en py con `a, b =`.
+
+Fix: cadena `id , id ...` que termina en `:=` (go) o `=` (py) = declaración:
+salta el chequeo de uso; el handler de "=" define TODA la cadena (ya lo
+hacía). Los argumentos de llamada (`fn(a, b)`) y los operadores de coma se
+siguen chequeando como usos (regresión cubierta). Harness 13/13, v1.2.1
+instalado. Nota del patrón: cadena de dos test que fallaron por expectativa
+propia (foo/parse sin definir) — corregidos con la definición real.
