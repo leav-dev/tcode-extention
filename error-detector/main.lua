@@ -227,7 +227,11 @@ local function analyzeScope(toks, cfg)
     end
   end
   local function defineImport(name, line)
+    -- Skip names that can never be an import binding: language keywords
+    -- (a path whose last segment is a keyword is not referenceable), blank
+    -- imports (_ "x") and builtins.
     if not name or name == "" then return end
+    if cfg.keywords[name] or cfg.builtins[name] or name == "_" then return end
     global[name] = true
     if not importBy[name] then
       importBy[name] = { line = line, used = false }
@@ -310,10 +314,12 @@ local function analyzeScope(toks, cfg)
       return j + 2
     elseif w == "import" then
       local k = j + 1
-      if isSym(k, "(") then -- import ( ... ): walk ids (aliases) and strings
+      if isSym(k, "(") then -- import ( ... ): walk ids (aliases), strings
+        -- and the dot-import marker
         local _, endj = readGroup(k, "(", ")")
         local g = k + 1
         local prevId
+        local dotNext = false
         while g < endj do
           local t = toks[g]
           if t.t == "id" then
@@ -321,7 +327,7 @@ local function analyzeScope(toks, cfg)
           elseif t.t == "str" then
             if prevId then
               defineImport(prevId, tok.line)
-            else
+            elseif not dotNext then
               local base = t.w:match("([^/]+)$") or t.w
               if base == "." then
                 wildcard = true
@@ -330,6 +336,10 @@ local function analyzeScope(toks, cfg)
               end
             end
             prevId = nil
+            dotNext = false
+          elseif t.t == "sym" and t.w == "." then
+            wildcard = true -- import ( . "x" ): names inject into the
+            dotNext = true  -- namespace; the path is not an unused candidate
           end
           g = g + 1
         end
@@ -549,7 +559,16 @@ local function analyzeScope(toks, cfg)
           i = handlePy(tok, i)
         end
       elseif cfg.builtins[w] then
-        i = i + 1
+        -- A builtin base (console.log, math.abs) also skips its member chain:
+        -- only the base is an identifier.
+        if isSym(i + 1, ".") then
+          i = i + 1 -- past '.'
+          while isSym(i, ".") and isId(i + 1) do
+            i = i + 2
+          end
+        else
+          i = i + 1
+        end
       elseif (cfg.lang == "go" or cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, ":") then
         -- go: x := ...; js/ts: {key: v} or annotation: not a usage
         i = i + 1
