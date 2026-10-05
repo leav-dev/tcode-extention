@@ -207,3 +207,25 @@ hacía). Los argumentos de llamada (`fn(a, b)`) y los operadores de coma se
 siguen chequeando como usos (regresión cubierta). Harness 13/13, v1.2.1
 instalado. Nota del patrón: cadena de dos test que fallaron por expectativa
 propia (foo/parse sin definir) — corregidos con la definición real.
+
+## Fix posterior: propiedades tras llamadas + imports tipo-only (v1.2.2)
+
+Reporte: "no detecta las propiedades de las clases de los imports definidos".
+Dos defectos reales:
+
+1. Selectores cuyo BASE es una EXPRESIÓN: `new C().prop`, `fn().prop`,
+   `arr[i].prop`, `makeT().Field` — el id tras `)`/`]` + `.` caía al chequeo
+   de uso → falso `undefined 'prop'`. La regla de cadenas solo cubría el
+   `base.member` directo. Fix: id cuyo token previo es `.` = selector
+   (nunca variable) → se salta; la base sigue chequeándose.
+2. Import usado SOLO como tipo (TS): `let c: Config`, `(x: Item)`,
+   `): MyType` — la anotación se saltaba y nunca se marcaba el import como
+   usado → falso `unused import`. Fix: el handler let/const/var reconoce la
+   anotación tras `:` (markUsed, no define); las anotaciones prev/next `:`
+   marcan uso de tipo; los params (readGroup flusheado) también.
+
+Harness 10/10 (new C().prop, static prop, fn().prop, items[i].a, tipo-only
+let, tipo en param, base aún chequeada, makeT().Field, regresiones).
+v1.2.2 instalado. Nota de proceso: un batch de edits atómico falló (búsqueda
+con indentación distinta) y NINGUNO aplicó — el retry por partes evitó
+estados a medias.
