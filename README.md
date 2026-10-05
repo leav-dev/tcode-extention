@@ -37,9 +37,11 @@ from this repo directly.
 | --- | --- | --- |
 | [vim-lite](vim-lite/) | `tcode.vimlite` | Vim muscle-memory keybindings: tabs (`alt+h`/`alt+l`), explorer (`alt+e`), save (`alt+w`), save as (`alt+shift+w`) |
 | [emacs-lite](emacs-lite/) | `tcode.emacslite` | Emacs-style `ctrl+x …` chords: switch buffer, explorer, kill buffer, undo |
-| [error-detector](error-detector/) | `tcode.errordetector` | **Code Linter** with real Lua logic: balance `() [] {}` (error) + scope analysis for **Go/JS/TS/Python** — undefined variables and unused imports (warning) — marked in the gutter and inline at the right of the line; HTML/Docker balance-only |
+| [error-detector](error-detector/) | `tcode.errordetector` | **Error Detector**: bracket balance `() [] {}` with string awareness (severity `error`) — small, language-agnostic script |
+| [undefined-vars](undefined-vars/) | `tcode.undefinedvars` | **Undefined Variables**: scope analysis for Go/JS/TS/Python (warning), package-wide in Go (sibling files) |
+| [unused-imports](unused-imports/) | `tcode.unusedimports` | **Unused Imports**: import bindings never used (warning), incl. type-only usage in TS |
 
-Each extension is its own git repo with its README and manifest.
+The linter trio replaces the former unified Code Linter; the editor **merges** the markers of every extension (per-provider diagnostics). Each extension is its own git repo with its README and manifest.
 
 <!-- The autosave (tcode.autosave) was retired: the behavior becomes a native
      editor setting. It lives on in the declarative-batch-1 feature history. -->
@@ -50,10 +52,10 @@ Each extension is its own git repo with its README and manifest.
   that lets declarative extensions **run their own logic** with gopher-lua
   (no cgo), plus **per-buffer diagnostics** with a gutter and the
   `tcode.diagnostics.set/clear` Lua API.
-- **Code Linter implemented** on top of scripting + diagnostics (see
-  [error-detector](error-detector/), features in `odd/tasks/error-detector.md`
-  and `odd/tasks/linter-scope.md`); next candidates: formatter on save,
-  status bar widgets and git integration as real-Lua extensions.
+- **Linter trio implemented** on top of scripting + multi-provider
+  diagnostics (Error Detector / Undefined Variables / Unused Imports; feature
+  in `odd/tasks/linter-scope.md`); next candidates: formatter on save, status
+  bar widgets and git integration as real-Lua extensions.
 - Snippets, grammars and declarative themes (editor milestone "language
   contributions").
 - The editor's own UI messages and docs are still Spanish: unifying them to
