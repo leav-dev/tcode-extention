@@ -70,6 +70,8 @@ end
 
 -- htmlTagCheck correlates HTML tags ignoring string content and comments.
 -- Returns {l=line, m=message}.
+-- Improvements: empty tags, invalid names, self-closing with space,
+-- DOCTYPE handling, and out-of-order closing detection.
 local function htmlTagCheck(content)
   local stack, errors = {}, {}
   local line, i, n = 1, 1, #content
@@ -96,6 +98,16 @@ local function htmlTagCheck(content)
           errors[#errors + 1] = { l = line, m = "HTML comment never closed" }
           i = n + 1
         end
+      -- Check for DOCTYPE
+      elseif content:sub(i, i+8):upper() == "<!DOCTYPE" then
+        local gt = content:find(">", i+9, true)
+        if gt then
+          for _ in content:sub(i, gt):gmatch("\n") do line = line + 1 end
+          i = gt + 1
+        else
+          errors[#errors + 1] = { l = line, m = "DOCTYPE declaration never closed" }
+          i = n + 1
+        end
       -- Check for closing tag
       elseif content:sub(i+1, i+1) == "/" then
         local j = i + 2
@@ -109,15 +121,39 @@ local function htmlTagCheck(content)
             break
           end
         end
-        if name ~= "" then
-          local top = stack[#stack]
-          if top and top[1] == name then
-            stack[#stack] = nil
-          elseif top then
-            errors[#errors + 1] = { l = line, m = "'</" .. name .. ">' closes '<" .. top[1] .. ">'" }
-            stack[#stack] = nil
+        if name == "" then
+          -- Empty closing tag </>
+          errors[#errors + 1] = { l = line, m = "empty closing tag '</>'" }
+        else
+          -- Validate tag name (must start with letter)
+          local firstChar = name:sub(1, 1)
+          if not firstChar:match("%a") then
+            errors[#errors + 1] = { l = line, m = "invalid tag name '</" .. name .. ">'" }
           else
-            errors[#errors + 1] = { l = line, m = "'</" .. name .. ">' without opening tag" }
+            -- Find matching opener in stack (out-of-order detection)
+            local foundIdx = nil
+            for k = #stack, 1, -1 do
+              if stack[k][1] == name:lower() then
+                foundIdx = k
+                break
+              end
+            end
+            if foundIdx then
+              -- Report any tags that were opened after the matched one
+              for k = #stack, foundIdx + 1, -1 do
+                errors[#errors + 1] = { l = stack[k][2], m = "'<" .. stack[k][1] .. ">' never closed (closed by '</" .. name .. ">')" }
+              end
+              -- Remove all tags from foundIdx to top
+              for k = #stack, foundIdx, -1 do
+                stack[k] = nil
+              end
+            elseif #stack > 0 then
+              -- Mismatched closing tag
+              errors[#errors + 1] = { l = line, m = "'</" .. name .. ">' closes '<" .. stack[#stack][1] .. ">'" }
+              stack[#stack] = nil
+            else
+              errors[#errors + 1] = { l = line, m = "'</" .. name .. ">' without opening tag" }
+            end
           end
         end
         -- Skip to end of tag
@@ -141,46 +177,56 @@ local function htmlTagCheck(content)
             break
           end
         end
-        if name ~= "" then
-          -- Find end of tag, skip strings in attributes
-          local inStr = false
-          local strDelim = nil
-          local selfClose = false
-          while j <= n do
-            local nc = content:sub(j, j)
-            if inStr then
-              if nc == "\\" then
-                j = j + 2
-              elseif nc == strDelim then
-                inStr = false
+        if name == "" then
+          -- Empty tag <>
+          errors[#errors + 1] = { l = line, m = "empty tag '<>'" }
+          i = i + 1
+        else
+          -- Validate tag name (must start with letter)
+          local firstChar = name:sub(1, 1)
+          if not firstChar:match("%a") then
+            errors[#errors + 1] = { l = line, m = "invalid tag name '<" .. name .. ">'" }
+            i = i + 1
+          else
+            -- Find end of tag, skip strings in attributes
+            local inStr = false
+            local strDelim = nil
+            local selfClose = false
+            while j <= n do
+              local nc = content:sub(j, j)
+              if inStr then
+                if nc == "\\" then
+                  j = j + 2
+                elseif nc == strDelim then
+                  inStr = false
+                  j = j + 1
+                else
+                  if nc == "\n" then line = line + 1 end
+                  j = j + 1
+                end
+              elseif nc == '"' or nc == "'" then
+                inStr = true
+                strDelim = nc
                 j = j + 1
+              elseif nc == ">" then
+                -- Check if self-closing (ends with /> or / >)
+                local prev = content:sub(j-1, j-1)
+                local prev2 = content:sub(j-2, j-2)
+                if prev == "/" or (prev == " " and prev2 == "/") then
+                  selfClose = true
+                end
+                j = j + 1
+                break
               else
                 if nc == "\n" then line = line + 1 end
                 j = j + 1
               end
-            elseif nc == '"' or nc == "'" then
-              inStr = true
-              strDelim = nc
-              j = j + 1
-            elseif nc == ">" then
-              -- Check if self-closing (ends with />)
-              local prev = content:sub(j-1, j-1)
-              if prev == "/" then
-                selfClose = true
-              end
-              j = j + 1
-              break
-            else
-              if nc == "\n" then line = line + 1 end
-              j = j + 1
             end
+            if not selfClose and not selfClosing[name:lower()] then
+              stack[#stack + 1] = { name:lower(), line }
+            end
+            i = j
           end
-          if not selfClose and not selfClosing[name:lower()] then
-            stack[#stack + 1] = { name:lower(), line }
-          end
-          i = j
-        else
-          i = i + 1
         end
       end
     else
