@@ -136,7 +136,30 @@ local function scan(content, cfg)
       end
     else
       local b = c:byte()
-      if b and ((b >= 97 and b <= 122) or (b >= 65 and b <= 90) or c == "_") then
+      if b and (b >= 48 and b <= 57) then
+        -- Number literal: consume the whole token (0o644, 0x1F, 0b101,
+        -- 1_000, 1e10, 1.5). Without this, 0o644 would leave "o644" as an
+        -- identifier and false-flag it as undefined.
+        local j = i + 1
+        while j <= n do
+          local nc = content:sub(j, j)
+          local ncb = nc:byte()
+          if ncb and ((ncb >= 48 and ncb <= 57) or (ncb >= 97 and ncb <= 122)
+            or (ncb >= 65 and ncb <= 90) or nc == "_") then
+            j = j + 1
+          elseif nc == "." then
+            local nx = content:sub(j + 1, j + 1):byte()
+            if nx and nx >= 48 and nx <= 57 then
+              j = j + 1 -- 1.5: the '.' belongs to the number
+            else
+              break
+            end
+          else
+            break
+          end
+        end
+        i = j -- no token: a number can never be a variable name
+      elseif b and ((b >= 97 and b <= 122) or (b >= 65 and b <= 90) or c == "_") then
         local j = i + 1
         while j <= n do
           local nb = content:sub(j, j):byte()
