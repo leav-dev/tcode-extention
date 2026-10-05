@@ -267,3 +267,11 @@ NO es un sufijo de versión de módulo (`/vN` con N≥2 o semver `vN.x.y`;
 en los casos de sufijo. Aplicado a los dos scripts (single y block form).
 Harness 8/8 (caso exacto, /v2 usado y sin usar, /v1, /v2.1.0, bloque,
 regresiones). v1.0.1 instalado en ambas extensiones; push `98df147`.
+
+## Fix posterior: literales numéricos (v1.0.2)
+
+Caso del usuario: `if err := os.WriteFile(path, []byte(content), 0o644); err != nil`
+→ falso `undefined 'o644'`. El tokenizer saltaba el dígito inicial y leía
+`o644` como identificador. Fix: el scanner consume el literal numérico
+COMPLETO (0o644, 0x1F, 0b101, 1_000, 1e10; `.` solo entre dígitos: 1.5).
+Aplicado a los dos scripts. Harness 6/6. v1.0.2 en ambas, push `22c9dc1`.
