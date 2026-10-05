@@ -40,6 +40,7 @@ from this repo directly.
 | [error-detector](error-detector/) | `tcode.errordetector` | **Error Detector**: bracket balance `() [] {}` with string awareness (severity `error`) — small, language-agnostic script |
 | [undefined-vars](undefined-vars/) | `tcode.undefinedvars` | **Undefined Variables**: scope analysis for Go/JS/TS/Python (warning), package-wide in Go (sibling files) |
 | [unused-imports](unused-imports/) | `tcode.unusedimports` | **Unused Imports**: import bindings never used (warning), incl. type-only usage in TS |
+| [git-changes](git-changes/) | `tcode.gitchanges` | **Git Changes**: status summary in status bar (files + lines), gutter markers for added/deleted/modified lines |
 
 The linter trio replaces the former unified Code Linter; the editor **merges** the markers of every extension (per-provider diagnostics). Each extension is its own git repo with its README and manifest.
 
