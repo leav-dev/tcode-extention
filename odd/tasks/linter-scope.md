@@ -229,3 +229,29 @@ let, tipo en param, base aún chequeada, makeT().Field, regresiones).
 v1.2.2 instalado. Nota de proceso: un batch de edits atómico falló (búsqueda
 con indentación distinta) y NINGUNO aplicó — el retry por partes evitó
 estados a medias.
+
+## Separación en 3 extensiones (trío linter)
+
+Decisión del usuario (directriz de RAM y modularidad): el Code Linter
+unificado se parte en tres, apoyado en el merge multi-proveedor ya
+implementado (cada script reemplaza su source; el editor mergea):
+
+1. `tcode.errordetector` → **Error Detector** v2.0.0: balance `() [] {}`
+   (error), script ~90 líneas sin tablas de lenguaje (el miembro RAM-min).
+2. `tcode.undefinedvars` → **Undefined Variables** v1.0.0 (warning): scope
+   go/js/ts/py con paquete multi-archivo; `alt+shift+v`.
+3. `tcode.unusedimports` → **Unused Imports** v1.0.0 (warning): imports sin
+   usar incl. tipo-only; `alt+shift+i`.
+
+RAM-min de diseño: las tablas de keywords/builtins por lenguaje se construyen
+LAZY (solo al primer archivo de ese lenguaje — `langTable` + `cfgFor` con
+cache); cada script solo lleva la maquinaria de su chequeo; hosts Lua del
+editor se crean al primer comando; instalación selectiva = menos RAM.
+
+Verificación: harness ×3 (18 casos) — balance(error+strings), vars
+(undefined, new C().prop, orden de paquete, hermanos via dir_files, multi-
+decl a,b :=, py/js) e imports (block/alias/blank/dot, tipo-only, py from).
+E2E: las 5 extensiones instaladas (2.0.0 + dos 1.0.0), el monorepo las
+contiene como blobs (lección: el contenido se agrega ANTES de crear el .git
+autor de la subcarpeta — si no, git los stubba como gitlinks y el clon no
+trae el contenido; corregido en `abd5f76`→`fca9b7e`).
