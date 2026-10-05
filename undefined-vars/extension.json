@@ -1,8 +1,10 @@
 {
   "id": "tcode.undefinedvars",
   "name": "Undefined Variables",
-  "version": "1.0.0",
-  "activation": ["onStartup"],
+  "version": "1.0.1",
+  "activation": [
+    "onStartup"
+  ],
   "contributes": {
     "commands": [
       {
@@ -13,10 +15,16 @@
       }
     ],
     "keybindings": [
-      { "key": "alt+shift+v", "command": "tcode.undefinedvars.check" }
+      {
+        "key": "alt+shift+v",
+        "command": "tcode.undefinedvars.check"
+      }
     ],
     "hooks": [
-      { "event": "onDidSaveBuffer", "command": "tcode.undefinedvars.check" }
+      {
+        "event": "onDidSaveBuffer",
+        "command": "tcode.undefinedvars.check"
+      }
     ]
   }
 }

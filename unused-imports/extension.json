@@ -1,8 +1,10 @@
 {
   "id": "tcode.unusedimports",
   "name": "Unused Imports",
-  "version": "1.0.0",
-  "activation": ["onStartup"],
+  "version": "1.0.1",
+  "activation": [
+    "onStartup"
+  ],
   "contributes": {
     "commands": [
       {
@@ -13,10 +15,16 @@
       }
     ],
     "keybindings": [
-      { "key": "alt+shift+i", "command": "tcode.unusedimports.check" }
+      {
+        "key": "alt+shift+i",
+        "command": "tcode.unusedimports.check"
+      }
     ],
     "hooks": [
-      { "event": "onDidSaveBuffer", "command": "tcode.unusedimports.check" }
+      {
+        "event": "onDidSaveBuffer",
+        "command": "tcode.unusedimports.check"
+      }
     ]
   }
 }

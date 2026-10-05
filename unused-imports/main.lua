@@ -228,6 +228,23 @@ local function analyzeImports(toks, cfg)
     end
   end
 
+  -- goPackageName: Go import path -> package identifier. The last path
+  -- element is the name UNLESS it is a module version suffix (/v2, /v3,
+  -- /v2.1.0), in which case the name is the element BEFORE it (Go rule;
+  -- /v1 is NOT a suffix: "x/y/v1" names the package v1).
+  local function goPackageName(path)
+    local base = path:match("([^/]+)$") or path
+    local major = base:match("^v(%d+)%.%d+%.%d+$") or base:match("^v(%d+)$")
+    if major and tonumber(major) >= 2 then
+      local prev = path:match("^(.*)/[^/]+$")
+      if prev then
+        local p = prev:match("([^/]+)$")
+        if p then base = p end
+      end
+    end
+    return base
+  end
+
   local function handleGo(tok, j)
     local w = tok.w
     if w == "func" then
@@ -275,7 +292,7 @@ local function analyzeImports(toks, cfg)
             if prevId then
               defineImport(prevId, tok.line)
             elseif not dotNext then
-              local base = t.w:match("([^/]+)$") or t.w
+              local base = goPackageName(t.w)
               if base == "." then
                 wildcard = true
               else
@@ -301,7 +318,7 @@ local function analyzeImports(toks, cfg)
         return j + 3
       end
       if toks[k] and toks[k].t == "str" then
-        local base = toks[k].w:match("([^/]+)$") or toks[k].w
+        local base = goPackageName(toks[k].w)
         if base == "." then
           wildcard = true
         else
