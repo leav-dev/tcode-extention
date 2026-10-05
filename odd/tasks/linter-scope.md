@@ -130,3 +130,22 @@ comando "Check code" (id y instalación sin cambios).
 **E2E:** install replace en el binario actual → "Code Linter (v1.1.0)" en
 `--list-extensions`; `main.lua` v1.1.0 desplegado. El motor de diagnostics
 + inline del editor no cambió (todo fue de la extensión).
+## Fix posterior: imports de Go en bloque `import ( ... )` (v1.1.1)
+
+Reporte del usuario: `import( "import" "import2" "import3")` no se reconocía.
+Reproducido con harness → 3 defectos del handler go + 1 general:
+
+1. Paths cuyo último segmento es keyword (`"import"`) se defineImportaban →
+   "unused import 'import'" inválido. Fix: defineImport filtra keywords,
+   builtins y `_` (blank imports ya no dan falso positivo).
+2. dot import en BLOQUE no activaba el wildcard. Fix: `.` en el bloque
+   activa wildcard y no trackea el path.
+3. (General) cadena de selectores de un builtin (`console.log`) no se
+   consumía → "undefined 'log'". Fix: el branch builtin consume la cadena
+   igual que el de identificadores.
+
+Commits: `c5e73a0` (fix + v1.1.1) y `8d2e553` (restauración de repos
+autor-locales por extensión: el monorepo había roto el install local, que
+exige carpeta con .git). Reinstalado: Code Linter v1.1.1. Harness: 10
+casos todos correctos (user-exact, block-used/unused/alias/blank/dot,
+single-line, js console.log, py from).
