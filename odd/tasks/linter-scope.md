@@ -255,3 +255,15 @@ E2E: las 5 extensiones instaladas (2.0.0 + dos 1.0.0), el monorepo las
 contiene como blobs (lección: el contenido se agrega ANTES de crear el .git
 autor de la subcarpeta — si no, git los stubba como gitlinks y el clon no
 trae el contenido; corregido en `abd5f76`→`fca9b7e`).
+
+## Fix posterior: sufijos de versión en paths de import (v1.0.1)
+
+Caso del usuario: `import "github.com/gdamore/tcell/v2"` usado como
+`tcell.NewEventKey(...)` — falso `undefined 'tcell'` + `unused 'v2'`.
+
+Regla de Go: el último segmento del path es el nombre del paquete solo si
+NO es un sufijo de versión de módulo (`/vN` con N≥2 o semver `vN.x.y`;
+`/v1` SÍ es el nombre). Nuevo `goPackageName()` extrae el segmento ANTERIOR
+en los casos de sufijo. Aplicado a los dos scripts (single y block form).
+Harness 8/8 (caso exacto, /v2 usado y sin usar, /v1, /v2.1.0, bloque,
+regresiones). v1.0.1 instalado en ambas extensiones; push `98df147`.
