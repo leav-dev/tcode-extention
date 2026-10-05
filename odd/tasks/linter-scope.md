@@ -169,3 +169,27 @@ workspace/paquete) o pasar el contexto del paquete al script.
 
 Harness: 9 casos OK (use-before-func, main-usos-later, global, var-block,
 método, still-catches-undefined, regressions). Commit `9e2d...`, v1.1.2.
+
+## Cross-file de paquete (v1.2.0) — proyecto multi-archivo resuelto
+
+"Sigue sin detectar las funciones del package, el package abarca varios
+archivos". El límite documentado anterior era del host Lua (sin io/os no
+puede leer los hermanos) → se resolvió con API del EDITOR:
+
+- tcode: script.go gana `DirFiles()` en ScriptAPI + tabla `tcode.dir_files()`
+  (array {path, content}); el controller implementa en host_files.go (nuevo
+  archivo: no tocó app.go): solo *.go, máx 64 archivos, 2 MiB, omite el
+  buffer activo, degrada en error. Commit `5ae2647` (junto al merge
+  multi-proveedor SetDiagnostics(source, ...)).
+- extension: pre-scan de nivel de paquete parametrizado por lista y reusable
+  → se corre sobre el buffer y sobre cada hermano del MISMO clause package
+  (packageNameOf filtra); hermanos de otro paquete se ignoran. Binarios
+  viejos sin tcode.dir_files degradan a buffer único (guard `if tcode.dir_files`).
+- Bugs cazados: isSym/isId globales leían la lista del buffer activo en el
+  pre-scan de hermanos (shadow local isSymArg/isIdArg); readGroup
+  parametrizado por lista (antes iteraba la lista externa).
+
+Harness 7/7 (hermano usado limpio; hermano de OTRO paquete no visible;
+global/var + func en hermanos; undefined real; regresiones). v1.2.0
+instalado. El merge multi-proveedor quedó desbloqueado: el lock de app.go
+se liberó y el árbol de tcode volvió a compilar (commit 5ae2647).

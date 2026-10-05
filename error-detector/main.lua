@@ -248,13 +248,13 @@ local function analyzeScope(toks, cfg)
     if r then r.used = true end
   end
   -- readGroup collects ids inside a balanced group starting at j.
-  local function readGroup(j, openCh, closeCh)
+  local function readGroup(list, j, openCh, closeCh)
     if not isSym(j, openCh) then return {}, j end
     local ids = {}
     local depth = 1
     local k = j + 1
-    while toks[k] do
-      local t = toks[k]
+    while list[k] do
+      local t = list[k]
       if t.t == "sym" then
         if t.w == openCh then
           depth = depth + 1
@@ -281,16 +281,28 @@ local function analyzeScope(toks, cfg)
   end
 
   -- Go: package-level names are visible file-wide regardless of declaration
-  -- order (var x = helper() before func helper() is valid). Pre-scan the
-  -- top-level (brace depth 0) declarations into global so a use before the
-  -- declaration is not a false positive. Cross-file package members are
-  -- still invisible: the host only exposes the active buffer (no io/os in
-  -- the script) — a workspace/package-symbols editor API would close that.
-  local function preScanPackageLevel()
+  -- order AND across the files of the same package (the package spans
+  -- multiple files). Pre-scan the top-level (brace depth 0) declarations of
+  -- a token list into global so a use before the declaration — or defined
+  -- in a sibling file — is not a false positive. The editor provides the
+  -- sibling files via tcode.dir_files() (the Lua host has no io/os); only
+  -- files with the same package clause are scanned.
+  local function preScanPackageLevel(toksArg)
+    -- isSym/isId de la lista argumento: los globales leen la lista del
+    -- buffer activo y no sirven para pre-scanear archivos hermanos.
+    local function isSymArg(j, ch)
+      local t = toksArg[j]
+      return t and t.t == "sym" and t.w == ch
+    end
+    local function isIdArg(j)
+      local t = toksArg[j]
+      return t and t.t == "id"
+    end
     local depth = 0
     local j = 1
-    while j <= n do
-      local t = toks[j]
+    local argn = #toksArg
+    while j <= argn do
+      local t = toksArg[j]
       if t.t == "sym" then
         if t.w == "{" then
           depth = depth + 1
@@ -301,29 +313,43 @@ local function analyzeScope(toks, cfg)
         local w = t.w
         if w == "func" then
           local k = j + 1
-          if isSym(k, "(") then -- receiver group: func (r *T) M(...)
-            local _, endj = readGroup(k, "(", ")")
+          if isSymArg(k, "(") then -- receiver group: func (r *T) M(...)
+            local _, endj = readGroup(toksArg, k, "(", ")")
             k = endj + 1
           end
-          if isId(k) then -- named function (or method) at package level
-            define(toks[k].w)
+          if isIdArg(k) then -- named function (or method) at package level
+            define(toksArg[k].w)
           end
         elseif w == "var" or w == "const" or w == "type" then
           local k = j + 1
-          if isSym(k, "(") then -- block form: var ( ... )
-            local ids, endj = readGroup(k, "(", ")")
+          if isSymArg(k, "(") then -- block form: var ( ... )
+            local ids, endj = readGroup(toksArg, k, "(", ")")
             for _, v in ipairs(ids) do define(v) end
           else
-            while isId(k) do
-              define(toks[k].w)
+            while isIdArg(k) do
+              define(toksArg[k].w)
               k = k + 1
-              if isSym(k, ",") then k = k + 1 end
+              if isSymArg(k, ",") then k = k + 1 end
             end
           end
         end
       end
       j = j + 1
     end
+  end
+
+  -- packageNameOf devuelve el nombre del clause package de una lista de
+  -- tokens, o nil si no lo tiene.
+  local function packageNameOf(toksArg)
+    for j = 1, #toksArg do
+      local t = toksArg[j]
+      if t.t == "id" and t.w == "package" then
+        local nx = toksArg[j + 1]
+        if nx and nx.t == "id" then return nx.w end
+        return nil
+      end
+    end
+    return nil
   end
 
   local function handleGo(tok, j)
@@ -333,7 +359,7 @@ local function analyzeScope(toks, cfg)
       local ids, endj
       local params = {}
       if isSym(k, "(") then -- receiver group: (r *T)
-        ids, endj = readGroup(k, "(", ")")
+        ids, endj = readGroup(toks, k, "(", ")")
         for _, rn in ipairs(ids) do params[#params + 1] = rn end
         k = endj + 1
       end
@@ -342,12 +368,12 @@ local function analyzeScope(toks, cfg)
         k = k + 1
       end
       if isSym(k, "(") then -- parameters
-        ids, endj = readGroup(k, "(", ")")
+        ids, endj = readGroup(toks, k, "(", ")")
         for _, p in ipairs(ids) do params[#params + 1] = p end
         k = endj + 1
         if isSym(k, "(") then -- named returns
           local rids
-          rids, endj = readGroup(k, "(", ")")
+          rids, endj = readGroup(toks, k, "(", ")")
           for _, rn in ipairs(rids) do params[#params + 1] = rn end
           k = endj + 1
         elseif isId(k) then -- bare return type: func f() error { ... }
@@ -362,7 +388,7 @@ local function analyzeScope(toks, cfg)
       local k = j + 1
       if isSym(k, "(") then -- import ( ... ): walk ids (aliases), strings
         -- and the dot-import marker
-        local _, endj = readGroup(k, "(", ")")
+        local _, endj = readGroup(toks, k, "(", ")")
         local g = k + 1
         local prevId
         local dotNext = false
@@ -412,7 +438,7 @@ local function analyzeScope(toks, cfg)
     elseif w == "var" or w == "const" or w == "type" then
       local k = j + 1
       if isSym(k, "(") then -- var ( ... ) / const ( ... ) / type ( ... )
-        local ids, endj = readGroup(k, "(", ")")
+        local ids, endj = readGroup(toks, k, "(", ")")
         for _, v in ipairs(ids) do define(v) end
         return endj + 1
       end
@@ -436,7 +462,7 @@ local function analyzeScope(toks, cfg)
         k = k + 1
       end
       if isSym(k, "(") then
-        ids, endj = readGroup(k, "(", ")")
+        ids, endj = readGroup(toks, k, "(", ")")
         pendingParams = ids
         k = endj + 1
       end
@@ -506,7 +532,7 @@ local function analyzeScope(toks, cfg)
         k = k + 1
       end
       if isSym(k, "(") then
-        local ids, endj = readGroup(k, "(", ")")
+        local ids, endj = readGroup(toks, k, "(", ")")
         -- Python has no braces: params are defined immediately in the
         -- current (single, file-level) scope.
         for _, p in ipairs(ids) do define(p) end
@@ -591,7 +617,23 @@ local function analyzeScope(toks, cfg)
   end
 
   if cfg.lang == "go" then
-    preScanPackageLevel()
+    preScanPackageLevel(toks)
+    -- Same-package sibling files: the editor provides the .go files of the
+    -- buffer's directory (capped); only files with the same package clause
+    -- contribute their top-level names. Older editor binaries without
+    -- tcode.dir_files degrade silently to single-file analysis.
+    if tcode.dir_files then
+      local files = tcode.dir_files()
+      if files then
+        local activePkg = packageNameOf(toks)
+        for i = 1, #files do
+          local sibling = scan(files[i].content, cfg)
+          if packageNameOf(sibling) == activePkg then
+            preScanPackageLevel(sibling)
+          end
+        end
+      end
+    end
   end
 
   while i <= n do
@@ -679,7 +721,7 @@ local function analyzeScope(toks, cfg)
       elseif tok.w == "(" then
         -- Arrow params: (a, b) => ... (js/ts)
         if cfg.lang == "js" or cfg.lang == "ts" then
-          local ids, endj = readGroup(i, "(", ")")
+          local ids, endj = readGroup(toks, i, "(", ")")
           if isSym(endj + 1, "=") and isSym(endj + 2, ">") then
             for _, p in ipairs(ids) do define(p) end
           end
