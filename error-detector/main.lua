@@ -274,6 +274,7 @@ local function analyzeScope(toks, cfg)
       for _, p in ipairs(pendingParams) do
         if not cfg.keywords[p] and not cfg.builtins[p] then
           cur()[p] = true
+          markUsed(p) -- TS param type annotations use imported types too
         end
       end
       pendingParams = nil
@@ -479,15 +480,25 @@ local function analyzeScope(toks, cfg)
     elseif w == "let" or w == "const" or w == "var" then
       local k = j + 1
       local depth = 0
+      local skipType = false
       while toks[k] do
         local t = toks[k]
         if t.t == "sym" then
           if t.w == "=" then break end
           if t.w == "{" or t.w == "[" then depth = depth + 1 end
           if t.w == "}" or t.w == "]" then depth = math.max(depth - 1, 0) end
+          if t.w == ":" and depth == 0 then
+            skipType = true -- TS annotation: let c: Config = ...
+          end
           if t.w == ";" and depth == 0 then break end
         elseif t.t == "id" then
-          if not cfg.keywords[t.w] then define(t.w) end
+          if skipType then
+            -- the annotation type IS a use of the imported type
+            markUsed(t.w)
+            skipType = false
+          elseif not cfg.keywords[t.w] then
+            define(t.w)
+          end
         elseif t.t == "nl" and depth == 0 then
           break
         end
@@ -662,7 +673,10 @@ local function analyzeScope(toks, cfg)
           i = i + 1
         end
       elseif (cfg.lang == "go" or cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, ":") then
-        -- go: x := ...; js/ts: {key: v} or annotation: not a usage
+        -- go: x := ...; js/ts: {key: v} or annotation: not a usage. An
+        -- annotation occurrence still USES a type (import { Config }; let
+        -- x: Config) — mark it so the import is not reported unused.
+        markUsed(w)
         i = i + 1
       elseif isSym(i + 1, ",") then
         -- Comma-chain: either a multi-target declaration (go `a, b := x`,
@@ -721,7 +735,14 @@ local function analyzeScope(toks, cfg)
         end
         i = i + 1
       elseif isSym(i - 1, ":") then
-        -- return/annotation types (): MyType, x: CustomType: not usages
+        -- return/annotation types (): MyType, x: CustomType: not usages,
+        -- but a TYPE USAGE for imports (markUsed keeps them not-unused).
+        markUsed(w)
+        i = i + 1
+      elseif isSym(i - 1, ".") then
+        -- Member selector whose base was an expression: fn().prop,
+        -- new Config().maxSize, arr[i].prop (the '.'-chain rule only covers
+        -- direct base.member). A property is never a variable.
         i = i + 1
       elseif isSym(i + 1, ".") then
         -- member chain: only the base is a variable; the rest are selectors
