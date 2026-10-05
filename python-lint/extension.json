@@ -1,0 +1,22 @@
+{
+  "id": "tcode.pylint",
+  "name": "Python Lint",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.pylint.check",
+        "title": "Check Python errors",
+        "script": "main.lua",
+        "fn": "check"
+      }
+    ],
+    "keybindings": [
+      { "key": "alt+shift+p", "command": "tcode.pylint.check" }
+    ],
+    "hooks": [
+      { "event": "onDidSaveBuffer", "command": "tcode.pylint.check" }
+    ]
+  }
+}
