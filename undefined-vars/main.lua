@@ -28,7 +28,7 @@ local function langTable(lang)
     return {
       lineComment = "//", blockComment = { "/*", "*/" },
       keywords = set("break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var"),
-      builtins = set("nil true false iota append cap close complex copy delete imag len make new panic print println real recover error string int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 uintptr float32 float64 bool byte rune any"),
+      builtins = set("nil true false iota append cap clear close complex complex64 complex128 copy delete imag len make max min new panic print println real recover error string int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 uintptr float32 float64 bool byte rune any comparable"),
     }
   elseif lang == "js" then
     return {

@@ -275,3 +275,20 @@ Caso del usuario: `if err := os.WriteFile(path, []byte(content), 0o644); err != 
 `o644` como identificador. Fix: el scanner consume el literal numérico
 COMPLETO (0o644, 0x1F, 0b101, 1_000, 1e10; `.` solo entre dígitos: 1.5).
 Aplicado a los dos scripts. Harness 6/6. v1.0.2 en ambas, push `22c9dc1`.
+
+## Fix posterior: builtins predeclarados de Go (v1.0.3)
+
+Caso del usuario: `min(1, 2)` en Go → falso `undefined 'min'` (también
+`max` y `clear`). La tabla `builtins` de Go en `undefined-vars` era anterior
+a Go 1.21 y no incluía los predeclarados `min`, `max`, `clear` ni los tipos
+`comparable`, `complex64`, `complex128` (`any` ya estaba).
+
+Fix: se agregan esos seis identificadores a la lista de builtins de Go.
+Verificado con harness temporal (gopher-lua, stub de `tcode.*`):
+- antes: `min`, `max`, `clear` → 3 falsos `undefined`;
+- después: 0 hallazgos, y un archivo con `noExiste()` / `otraTampoco` sigue
+  reportando los 2 undefined reales (regresión limpia).
+
+`unused-imports` no se toca: ahí `builtins` solo se usa para SALTAR
+identificadores, nunca para decidir si un import está usado, así que el
+mismo hueco no podía producir un reporte incorrecto. v1.0.3.
