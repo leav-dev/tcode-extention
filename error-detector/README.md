@@ -1,6 +1,6 @@
 # Error Detector (`tcode.errordetector`)
 
-Bracket balance + HTML tag balance extension for tcode: correlates `() [] {}`
+Bracket balance + HTML tag validation extension for tcode: correlates `() [] {}`
 and HTML tags with string/comment awareness, severity `error` (gutter `!`, red).
 Part of the linter trio — [Undefined Variables](../undefined-vars/) and
 [Unused Imports](../unused-imports/) run independently and the editor merges
@@ -25,10 +25,16 @@ tcode --install-extension <path>/error-detector
 `'X' does not match 'Y'`, `unterminated string (delimiter 'X')`.
 Strings (`"`, `'`, `` ` `` with `\` escapes) are ignored.
 
-**HTML tags:** `'<div>' never closed`, `'</span>' without opening tag`,
-`'</p>' closes '<div>'`, `HTML comment never closed`. Self-closing tags
-(`<br>`, `<img>`, `<input>`, etc.) are recognized. Comments (`<!-- ... -->`)
-and attribute strings are ignored.
+**HTML tags** (only on `.html`, `.htm`, `.xhtml`, `.svg` files):
+- Unclosed tags: `'<div>' never closed`
+- Mismatched tags: `'</span>' without opening tag`, `'</p>' closes '<div>'`
+- Malformed tags: `Empty tag '<>'`, `Empty closing tag '</>'`, `Malformed tag: space after '<'`, `Invalid tag name '<123>'`
+- Malformed attributes: `Attribute 'class' without value`, `Duplicate attribute 'id'`
+- DOCTYPE issues: `Duplicate <!DOCTYPE> declaration`, `<!DOCTYPE> must be the first element`, `<!DOCTYPE> must contain 'html'`, `<!DOCTYPE> never closed`
+- Comments: `HTML comment never closed`
+
+Self-closing tags (`<br>`, `<img>`, `<input>`, etc.) are recognized.
+Comments (`<!-- ... -->`) and attribute strings are ignored.
 
 Every message is English. This script is intentionally compact,
 language-agnostic, no tables — the RAM-min member of the trio.

@@ -71,3 +71,28 @@ reporta que **no detecta etiquetas HTML no cerradas** (ej: `<div>` sin
   strings en atributos, comentarios HTML, y self-closing tags
 - Integración: `check()` ahora ejecuta `balanceCheck()` + `htmlTagCheck()`
   y publica todos los errores con `tcode.diagnostics.set()`
+
+---
+
+## v4: Mejoras de validación (en progreso)
+
+### Nuevas validaciones solicitadas
+
+1. **Etiquetas mal formadas**: `< div>`, `<div class=>`, `<>`, `</>`, nombres inválidos
+2. **Atributos mal formados**: comillas sin cerrar, atributos duplicados, `class=>`
+3. **DOCTYPE y estructura**: `<!DOCTYPE>` mal formado, múltiples DOCTYPE, DOCTYPE después de contenido
+
+### Límites documentados (sin cambios)
+
+- No valida anidamiento semántico (ej: `<div><span></div></span>`)
+- No valida atributos requeridos o estructura HTML5 semántica
+- No valida entidades HTML
+
+### Plan de implementación v4
+
+1. [x] Actualizar documento de feature
+2. [ ] Implementar detección de etiquetas mal formadas
+3. [ ] Implementar detección de atributos mal formados
+4. [ ] Implementar detección de DOCTYPE y estructura
+5. [ ] Actualizar README.md
+6. [ ] Commit

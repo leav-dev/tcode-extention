@@ -69,7 +69,8 @@ local function balanceCheck(content)
 end
 
 -- htmlTagCheck correlates HTML tags ignoring string content and comments.
--- Returns {l=line, m=message}.
+-- Detects: unclosed tags, mismatched tags, malformed tags, malformed attributes,
+-- DOCTYPE issues. Returns {l=line, m=message}.
 local function htmlTagCheck(content)
   local stack, errors = {}, {}
   local line, i, n = 1, 1, #content
@@ -78,6 +79,8 @@ local function htmlTagCheck(content)
     img=true, input=true, link=true, meta=true, param=true,
     source=true, track=true, wbr=true
   }
+  local doctypeSeen = false
+  local hasContent = false  -- tracks non-whitespace content for DOCTYPE validation
 
   while i <= n do
     local c = content:sub(i, i)
@@ -92,9 +95,28 @@ local function htmlTagCheck(content)
           for _ in content:sub(i, e+2):gmatch("\n") do line = line + 1 end
           i = e + 3
         else
-          -- Unterminated comment
           errors[#errors + 1] = { l = line, m = "HTML comment never closed" }
           i = n + 1
+        end
+      -- Check for DOCTYPE
+      elseif content:sub(i, i+8):upper() == "<!DOCTYPE" then
+        if doctypeSeen then
+          errors[#errors + 1] = { l = line, m = "Duplicate <!DOCTYPE> declaration" }
+        elseif hasContent then
+          errors[#errors + 1] = { l = line, m = "<!DOCTYPE> must be the first element" }
+        end
+        local gt = content:find(">", i+9, true)
+        if not gt then
+          errors[#errors + 1] = { l = line, m = "<!DOCTYPE> never closed" }
+          i = n + 1
+        else
+          local doctypeContent = content:sub(i+9, gt-1):lower()
+          if not doctypeContent:match("html") then
+            errors[#errors + 1] = { l = line, m = "<!DOCTYPE> must contain 'html'" }
+          end
+          doctypeSeen = true
+          for _ in content:sub(i, gt):gmatch("\n") do line = line + 1 end
+          i = gt + 1
         end
       -- Check for closing tag
       elseif content:sub(i+1, i+1) == "/" then
@@ -109,7 +131,9 @@ local function htmlTagCheck(content)
             break
           end
         end
-        if name ~= "" then
+        if name == "" then
+          errors[#errors + 1] = { l = line, m = "Empty closing tag '</>'" }
+        else
           local top = stack[#stack]
           if top and top[1] == name then
             stack[#stack] = nil
@@ -120,7 +144,6 @@ local function htmlTagCheck(content)
             errors[#errors + 1] = { l = line, m = "'</" .. name .. ">' without opening tag" }
           end
         end
-        -- Skip to end of tag
         local gt = content:find(">", j, true)
         if gt then
           for _ in content:sub(i, gt):gmatch("\n") do line = line + 1 end
@@ -130,6 +153,10 @@ local function htmlTagCheck(content)
         end
       -- Opening tag
       else
+        -- Check for malformed tag: space after '<'
+        if content:sub(i+1, i+1):match("%s") then
+          errors[#errors + 1] = { l = line, m = "Malformed tag: space after '<'" }
+        end
         local j = i + 1
         local name = ""
         while j <= n do
@@ -141,11 +168,23 @@ local function htmlTagCheck(content)
             break
           end
         end
-        if name ~= "" then
-          -- Find end of tag, skip strings in attributes
+        if name == "" then
+          errors[#errors + 1] = { l = line, m = "Empty tag '<>'" }
+          i = i + 1
+        else
+          -- Validate tag name starts with letter
+          if not name:sub(1,1):match("%a") then
+            errors[#errors + 1] = { l = line, m = "Invalid tag name '<" .. name .. ">'" }
+          end
+          hasContent = true
+          -- Find end of tag, skip strings in attributes, validate attributes
           local inStr = false
           local strDelim = nil
           local selfClose = false
+          local attrs = {}
+          local attrName = nil
+          local attrHasValue = false
+          local lastNonSpace = j
           while j <= n do
             local nc = content:sub(j, j)
             if inStr then
@@ -161,17 +200,47 @@ local function htmlTagCheck(content)
             elseif nc == '"' or nc == "'" then
               inStr = true
               strDelim = nc
+              attrHasValue = true
               j = j + 1
             elseif nc == ">" then
-              -- Check if self-closing (ends with />)
               local prev = content:sub(j-1, j-1)
               if prev == "/" then
                 selfClose = true
               end
+              -- Check for attribute without value before '>'
+              if attrName and not attrHasValue then
+                errors[#errors + 1] = { l = line, m = "Attribute '" .. attrName .. "' without value" }
+              end
               j = j + 1
               break
-            else
+            elseif nc == "=" then
+              -- Check for malformed attribute: 'class=>'
+              local nextChar = content:sub(j+1, j+1)
+              if nextChar == ">" then
+                errors[#errors + 1] = { l = line, m = "Attribute '" .. attrName .. "' without value" }
+              end
+              j = j + 1
+            elseif nc:match("%s") then
+              -- Whitespace: if we had an attribute name, it has no value
+              if attrName and not attrHasValue then
+                -- This is OK, attribute without value (boolean attribute)
+                attrName = nil
+              end
               if nc == "\n" then line = line + 1 end
+              j = j + 1
+            else
+              -- Attribute name character
+              if not attrName then
+                attrName = nc
+                attrHasValue = false
+                if attrs[nc:lower()] then
+                  errors[#errors + 1] = { l = line, m = "Duplicate attribute '" .. nc .. "'" }
+                end
+                attrs[nc:lower()] = true
+              else
+                attrName = attrName .. nc
+              end
+              lastNonSpace = j
               j = j + 1
             end
           end
@@ -179,11 +248,12 @@ local function htmlTagCheck(content)
             stack[#stack + 1] = { name:lower(), line }
           end
           i = j
-        else
-          i = i + 1
         end
       end
     else
+      if not c:match("%s") then
+        hasContent = true
+      end
       i = i + 1
     end
   end
@@ -193,6 +263,16 @@ local function htmlTagCheck(content)
     errors[#errors + 1] = { l = e[2], m = "'<" .. e[1] .. ">' never closed" }
   end
   return errors
+end
+
+-- isHTMLFile checks if the buffer path has an HTML-related extension.
+local function isHTMLFile(path)
+  local ext = path:match("%.(%w+)$")
+  if not ext then
+    return false
+  end
+  ext = ext:lower()
+  return ext == "html" or ext == "htm" or ext == "xhtml" or ext == "svg"
 end
 
 function check()
@@ -206,9 +286,12 @@ function check()
   for _, e in ipairs(balanceErrors) do
     diags[#diags + 1] = { line = e.l, message = e.m, severity = "error" }
   end
-  local htmlErrors = htmlTagCheck(content)
-  for _, e in ipairs(htmlErrors) do
-    diags[#diags + 1] = { line = e.l, message = e.m, severity = "error" }
+  -- Only run HTML tag check on HTML files
+  if isHTMLFile(path) then
+    local htmlErrors = htmlTagCheck(content)
+    for _, e in ipairs(htmlErrors) do
+      diags[#diags + 1] = { line = e.l, message = e.m, severity = "error" }
+    end
   end
 
   local nerr = #diags
