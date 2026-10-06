@@ -122,6 +122,10 @@ func main() {
 		{name: "js multiline import", path: "a.js", content: "import {\n  A,\n  B\n} from 'm';\nconsole.log(A, B);\n"},
 		{name: "go multiline import", path: "a.go", content: "package m\nimport (\n  \"fmt\"\n  alias \"x/y\"\n)\nfunc f() {\n  fmt.Println(alias.V)\n}\n"},
 		{name: "py truly undef", path: "a.py", content: "print(nope)\n", want: []string{"1:warning:undefined 'nope'"}},
+		{name: "py listcompr use-before-for", path: "a.py", content: "instituciones = []\nmissing_ids = [\n    str(i['institucion_id'])\n    for i in instituciones\n    if i.get('institucion_id') and not i.get('institucion_dane')\n]\n"},
+		{name: "py dictcompr", path: "a.py", content: "items = []\nd = {k: v for k, v in items}\n"},
+		{name: "py generator", path: "a.py", content: "items = []\ns = sum(x for x in items)\n"},
+		{name: "py regular loop", path: "a.py", content: "items = []\nfor i in items:\n    print(i)\n"},
 	}
 	failures := 0
 	for _, tc := range cases {

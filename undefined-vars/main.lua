@@ -381,6 +381,30 @@ local function analyzeScope(toks, cfg)
     return nil
   end
 
+  -- pyForTargets pre-scan: comprehensions use their `for` target before
+  -- its textual definition (`[f(x) for x in xs]` visits `f(x)` first).
+  -- Walk all tokens once; on every `for` collect target ids up to the
+  -- matching `in` on the same logical line (same rule as handlePy `for`)
+  -- and define them in global before the single-pass main loop runs.
+  local function preScanPyForTargets(toksArg)
+    local m = #toksArg
+    local j = 1
+    while j <= m do
+      local t = toksArg[j]
+      if t.t == "id" and t.w == "for" then
+        local k = j + 1
+        while toksArg[k] and not (toksArg[k].t == "id" and toksArg[k].w == "in") do
+          if toksArg[k].t == "id" and not cfg.keywords[toksArg[k].w] then
+            define(toksArg[k].w)
+          end
+          if toksArg[k].t == "nl" then break end
+          k = k + 1
+        end
+      end
+      j = j + 1
+    end
+  end
+
   -- goPackageName: Go import path -> package identifier. The last path
   -- element is the name UNLESS it is a module version suffix (/v2, /v3,
   -- /v2.1.0), in which case the name is the element BEFORE it (Go rule;
@@ -758,6 +782,10 @@ local function analyzeScope(toks, cfg)
         end
       end
     end
+  end
+
+  if cfg.lang == "py" then
+    preScanPyForTargets(toks)
   end
 
   while i <= n do
