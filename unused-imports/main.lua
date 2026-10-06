@@ -176,11 +176,12 @@ end
 
 -- --- Import tracking (go/js/ts/py): collect + mark usage + unused at EOF ---
 
-local function analyzeImports(toks, cfg)
+local function analyzeImports(toks, cfg, path)
   local findings = {}
   local global = {}
   local stack = { global }
-  local importBy = {}           -- name -> { line, used }
+  local importBy = {}           -- local name -> { line, used }
+  local importSrc = {}          -- local name -> { remote, src } for existence checks
   local wildcard = false        -- go `import . "x"`: names inject, no track
   local pendingParams = nil
   local i, n = 1, #toks
@@ -250,6 +251,37 @@ local function analyzeImports(toks, cfg)
       pendingParams = nil
     end
   end
+  -- scanAfterParams looks past a `)` closing a JS/TS param group.
+  -- Returns kind, pos: "body" (pos at `{`), "arrow" (pos at `=` of
+  -- `=>`), "end" (pos at `;`: overload/declare), nil (plain call).
+  -- An optional TS `: type` annotation is skipped, bracket-aware over
+  -- (), [], <>. A top-level `{` is taken as the body block.
+  local function scanAfterParams(endj)
+    local k = endj + 1
+    if isSym(k, "{") then return "body", k end
+    if isSym(k, "=") and isSym(k + 1, ">") then return "arrow", k end
+    if not isSym(k, ":") then return nil end
+    local depth = 0
+    local j = k + 1
+    while toks[j] do
+      local t = toks[j]
+      if t.t == "sym" then
+        local w = t.w
+        if w == "(" or w == "[" or w == "<" then
+          depth = depth + 1
+        elseif w == ")" or w == "]" or w == ">" then
+          depth = math.max(depth - 1, 0)
+        elseif depth == 0 then
+          if w == "{" then return "body", j end
+          if w == "=" and isSym(j + 1, ">") then return "arrow", j end
+          if w == ";" then return "end", j end
+          if w == "," or w == "=" then return nil end
+        end
+      end
+      j = j + 1
+    end
+    return nil
+  end
 
   -- goPackageName: Go import path -> package identifier. The last path
   -- element is the name UNLESS it is a module version suffix (/v2, /v3,
@@ -282,6 +314,12 @@ local function analyzeImports(toks, cfg)
       if isId(k) then
         define(toks[k].w)
         k = k + 1
+      end
+      if isSym(k, "[") then
+        -- Generic type params: func f[T any](x T).
+        local tids, tendj = readGroup(toks, k, "[", "]")
+        for _, t in ipairs(tids) do params[#params + 1] = t end
+        k = tendj + 1
       end
       if isSym(k, "(") then
         ids, endj = readGroup(toks, k, "(", ")")
@@ -388,6 +426,15 @@ local function analyzeImports(toks, cfg)
         define(toks[k].w)
       end
       return j + 2
+    elseif w == "catch" then
+      -- catch (e) { ... }: e is scoped to the catch block.
+      local k = j + 1
+      if isSym(k, "(") then
+        local ids, endj = readGroup(toks, k, "(", ")")
+        pendingParams = ids
+        return endj + 1
+      end
+      return j + 1
     elseif w == "type" or w == "interface" then
       if isId(j + 1) then define(toks[j + 1].w) end
       return j + 2
@@ -420,28 +467,90 @@ local function analyzeImports(toks, cfg)
       end
       return k
     elseif w == "import" then
+      -- ESM import: [default] [, * as ns | { ... }] from 'spec'.
+      -- Records each LOCAL binding with its REMOTE name and the module
+      -- spec, so the existence check can verify `remote` in `spec`.
+      -- `import {a as b}` binds b locally; a is what the target must
+      -- export. Side-effect imports bind nothing.
       local k = j + 1
       local depth = 0
+      local bindings = {}
+      local defaultDone, sawBrace, sawStar = false, false, false
+      local function reg(localName, remoteName)
+        if localName and localName ~= "" then
+          bindings[#bindings + 1] = { lname = localName, rname = remoteName or localName }
+        end
+      end
+      if toks[k] and toks[k].t == "id" and toks[k].w == "type" then
+        local nx = toks[k + 1]
+        if nx and ((nx.t == "sym" and (nx.w == "{" or nx.w == "*")) or nx.t == "id") then
+          k = k + 1 -- TS `import type ...` marker
+        end
+      end
       while toks[k] do
         local t = toks[k]
         if t.t == "sym" then
           if t.w == "{" or t.w == "[" then
             depth = depth + 1
+            sawBrace = true
           elseif t.w == "}" or t.w == "]" then
             depth = math.max(depth - 1, 0)
+          elseif t.w == "*" and depth == 0 then
+            sawStar = true
           elseif t.w == ";" and depth == 0 then
             break
           end
+          k = k + 1
         elseif t.t == "id" then
-          if not (t.w == "as" or t.w == "type" or (t.w == "from" and depth == 0)) then
-            defineImport(t.w, tok.line)
+          if t.w == "from" and depth == 0 then
+            k = k + 1
+            break -- module spec follows
+          elseif t.w == "type" and depth > 0 then
+            k = k + 1 -- TS `import {type A}` marker
+          elseif depth > 0 then
+            local remote = t.w
+            local nk = k + 1
+            if toks[nk] and toks[nk].t == "id" and toks[nk].w == "as"
+              and toks[nk + 1] and toks[nk + 1].t == "id" then
+              reg(toks[nk + 1].w, remote)
+              k = nk + 2
+            else
+              reg(remote, remote)
+              k = k + 1
+            end
+          else
+            if sawStar and t.w == "as" then
+              if toks[k + 1] and toks[k + 1].t == "id" then
+                reg(toks[k + 1].w, "*")
+                k = k + 2
+              else
+                k = k + 1
+              end
+            elseif not defaultDone and not sawBrace and not sawStar and t.w ~= "as" then
+              reg(t.w, "default")
+              defaultDone = true
+              k = k + 1
+            else
+              k = k + 1
+            end
           end
         elseif t.t == "str" then
+          if depth == 0 then break end -- side-effect import: no bindings
+          k = k + 1
+        elseif t.t == "nl" then
           if depth == 0 then break end
-        elseif t.t == "nl" and depth == 0 then
+          k = k + 1
+        else
           break
         end
-        k = k + 1
+      end
+      local src = nil
+      if toks[k] and toks[k].t == "str" then src = toks[k].w end
+      for _, b in ipairs(bindings) do
+        defineImport(b.lname, tok.line)
+        if src and not importSrc[b.lname] then
+          importSrc[b.lname] = { rname = b.rname, src = src }
+        end
       end
       return k
     end
@@ -490,27 +599,60 @@ local function analyzeImports(toks, cfg)
       end
       return k
     elseif w == "from" then
+      -- from <spec> import <names>: <spec> is dots + dotted path
+      -- (".y", ".", "..pkg", "os"). Only relative specs (leading
+      -- dot) are resolvable; the rest record no src and are skipped by
+      -- the existence check. `a as b` binds b locally; a is remote.
       local k = j + 1
+      local specparts = {}
       while toks[k] and not (toks[k].t == "id" and toks[k].w == "import") do
         if toks[k].t == "nl" then return k end
+        if toks[k].t == "sym" and toks[k].w == "." then
+          specparts[#specparts + 1] = "."
+        elseif toks[k].t == "id" then
+          specparts[#specparts + 1] = toks[k].w
+        else
+          return k
+        end
         k = k + 1
       end
-      k = k + 1
+      if not (toks[k] and toks[k].t == "id") then return k end
+      k = k + 1 -- skip `import`
+      local spec = table.concat(specparts)
+      local rel = spec:sub(1, 1) == "."
+      local depth = 0
       while toks[k] do
         local t = toks[k]
-        if t.t == "str" or t.t == "nl" then break end
-        if t.t == "id" then
-          if t.w == "as" then
-            if isId(k + 1) then defineImport(toks[k + 1].w, tok.line) end
-            k = k + 2
+        if t.t == "sym" then
+          if t.w == "(" then
+            depth = depth + 1
+          elseif t.w == ")" then
+            depth = math.max(depth - 1, 0)
+          elseif t.w == ";" then
+            break
+          elseif t.w ~= "," then
+            break
+          end
+          k = k + 1
+        elseif t.t == "id" then
+          local remote, localName = t.w, t.w
+          local nk = k + 1
+          if toks[nk] and toks[nk].t == "id" and toks[nk].w == "as"
+            and toks[nk + 1] and toks[nk + 1].t == "id" then
+            localName = toks[nk + 1].w
+            k = nk + 2
           else
-            defineImport(t.w, tok.line)
             k = k + 1
           end
-        elseif t.t == "sym" and t.w == "," then
+          defineImport(localName, tok.line)
+          if rel and not importSrc[localName] then
+            importSrc[localName] = { rname = remote, src = spec }
+          end
+        elseif t.t == "nl" then
+          if depth == 0 then break end -- parenthesized lists may span lines
           k = k + 1
         else
-          break
+          break -- str, `*` (not a token; absent) ends the list
         end
       end
       return k
@@ -610,6 +752,24 @@ local function analyzeImports(toks, cfg)
         i = i + 1
       elseif isSym(i - 1, ".") then
         i = i + 1 -- member selector after an expression: never the binding
+      elseif (cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, "(") then
+        local mids, mendj = readGroup(toks, i + 1, "(", ")")
+        local kind, kpos = scanAfterParams(mendj)
+        if kind == "body" then
+          -- Shorthand method definition: name + params are definitions.
+          define(w)
+          pendingParams = mids
+          i = kpos
+        elseif kind == "end" then
+          -- Overload/declare signature: name definition, skip annotation.
+          define(w)
+          pendingParams = nil
+          i = kpos
+        else
+          -- Plain call: the callee is a usage.
+          if defined(w) then markUsed(w) end
+          i = i + 1
+        end
       elseif isSym(i + 1, ".") then
         if defined(w) then markUsed(w) end
         i = i + 1
@@ -633,10 +793,16 @@ local function analyzeImports(toks, cfg)
       elseif tok.w == "(" then
         if cfg.lang == "js" or cfg.lang == "ts" then
           local ids, endj = readGroup(toks, i, "(", ")")
-          if isSym(endj + 1, "=") and isSym(endj + 2, ">") then
+          -- Arrow params, with optional TS return type in between.
+          if scanAfterParams(endj) == "arrow" then
             for _, p in ipairs(ids) do define(p) end
           end
         end
+        i = i + 1
+      elseif tok.w == ";" then
+        -- A `;` ends any declaration: drop params of bodyless
+        -- overloads so they never leak into an unrelated `{` below.
+        pendingParams = nil
         i = i + 1
       elseif tok.w == "=" then
         if cfg.lang == "py" then
@@ -689,10 +855,439 @@ local function analyzeImports(toks, cfg)
     end
   end
 
+  -- --- Direction 2: the imported name must exist in the source module ---
+  -- Only relative file imports are resolvable (JS/TS `./x`, Python
+  -- `from .y import z`). Anything unreadable is silently skipped: bare
+  -- specifiers, stdlib, path aliases, parent escapes, Go packages.
+  -- Requires tcode.read_file (newer editors); older ones keep direction 1.
+  local fileCache = {} -- relpath -> content or false; fresh per check()
+  local canRead = tcode.read_file ~= nil
+
+  local function readCached(rel)
+    if fileCache[rel] == nil then
+      local r = canRead and tcode.read_file(rel)
+      if type(r) == "table" and type(r.content) == "string" then
+        fileCache[rel] = r.content
+      else
+        fileCache[rel] = false
+      end
+    end
+    if fileCache[rel] == false then return nil end
+    return fileCache[rel]
+  end
+
+  -- joinNorm lexically normalizes a buffer-dir-relative path, resolving
+  -- `.`/`..`. Returns nil when it would escape the buffer dir (which
+  -- read_file would reject too).
+  local function joinNorm(p)
+    local parts = {}
+    for part in p:gmatch("[^/]+") do
+      if part == "." or part == "" then
+        -- skip
+      elseif part == ".." then
+        if #parts == 0 then return nil end
+        parts[#parts] = nil
+      else
+        parts[#parts + 1] = part
+      end
+    end
+    return table.concat(parts, "/")
+  end
+
+  local function targetDirOf(rel)
+    return rel:match("^(.*)/[^/]*$") or ""
+  end
+
+  -- maskContent blanks strings and comments (block-aware) so export/def
+  -- patterns never fire inside them. Newlines are preserved; the result
+  -- is only ever pattern-matched, never shown.
+  local function maskContent(content)
+    local out = {}
+    local i, n = 1, #content
+    local delim = nil
+    while i <= n do
+      local c = content:sub(i, i)
+      if delim then
+        if c == "\\" then
+          out[#out + 1] = "  "
+          i = i + 2
+        elseif c == delim then
+          out[#out + 1] = " "
+          delim = nil
+          i = i + 1
+        else
+          out[#out + 1] = (c == "\n" and "\n" or " ")
+          i = i + 1
+        end
+      elseif c == '"' or c == "'" or c == "`" then
+        delim = c
+        out[#out + 1] = " "
+        i = i + 1
+      elseif c == "/" and content:sub(i + 1, i + 1) == "/" then
+        local nl = content:find("\n", i, true)
+        if nl then
+          i = nl
+        else
+          break
+        end
+      elseif c == "/" and content:sub(i + 1, i + 1) == "*" then
+        local close = content:find("*/", i + 2, true)
+        if close then
+          for _ in content:sub(i, close + 1):gmatch("\n") do out[#out + 1] = "\n" end
+          i = close + 2
+        else
+          break
+        end
+      else
+        out[#out + 1] = c
+        i = i + 1
+      end
+    end
+    return table.concat(out)
+  end
+
+  local jsExts = { ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs" }
+
+  -- resolveJs finds a relative spec's target: returns relpath + content.
+  -- fromDir is the importing file's dir, "" for the buffer dir.
+  local function resolveJs(spec, fromDir)
+    if spec:sub(1, 1) ~= "." then return nil end
+    local base = spec:gsub("^%./", "")
+    local prefix = (fromDir == nil or fromDir == "") and "" or (fromDir .. "/")
+    local cands = {}
+    if base:match("%.[%w]+$") then cands[#cands + 1] = prefix .. base end
+    for _, e in ipairs(jsExts) do cands[#cands + 1] = prefix .. base .. e end
+    for _, e in ipairs(jsExts) do cands[#cands + 1] = prefix .. base .. "/index" .. e end
+    for _, c in ipairs(cands) do
+      local norm = joinNorm(c)
+      if norm then
+        local content = readCached(norm)
+        if content then return norm, content end
+      end
+    end
+    return nil
+  end
+
+  -- maskSeg blanks strings and line comments in one line,
+  -- length-preserving (block comments are handled by the caller).
+  local function maskSeg(line)
+    local out = {}
+    local i, n = 1, #line
+    local delim = nil
+    while i <= n do
+      local c = line:sub(i, i)
+      if delim then
+        if c == "\\" then
+          out[#out + 1] = "  "
+          i = i + 2
+        elseif c == delim then
+          out[#out + 1] = " "
+          delim = nil
+          i = i + 1
+        else
+          out[#out + 1] = " "
+          i = i + 1
+        end
+      elseif c == '"' or c == "'" or c == "`" then
+        delim = c
+        out[#out + 1] = " "
+        i = i + 1
+      elseif c == "/" and line:sub(i + 1, i + 1) == "/" then
+        break
+      else
+        out[#out + 1] = c
+        i = i + 1
+      end
+    end
+    return table.concat(out)
+  end
+
+  -- emitExportList records one `export { ... }` item list: plain names go
+  -- to `names`, while a trailing `from 'spec'` turns items into re-export
+  -- entries (the pre-as name is what the target must export).
+  local function emitExportList(listText, mrest, rrest, names, reexp)
+    local gspec = nil
+    if mrest and mrest:find("from") then
+      gspec = rrest:match("^}%s*from%s*\"([^\"]+)\"")
+        or rrest:match("^}%s*from%s*'([^']+)'")
+    end
+    for item in listText:gmatch("[^,]+") do
+      local words = {}
+      for w in item:gmatch("%S+") do words[#words + 1] = w end
+      local exported, orig = nil, nil
+      if #words == 3 and words[2] == "as" then
+        exported, orig = words[3], words[1]
+      elseif #words == 2 and words[1] == "type" then
+        exported, orig = words[2], words[2]
+      elseif #words == 1 and words[1] ~= "type" then
+        exported, orig = words[1], words[1]
+      end
+      if exported then
+        if gspec then
+          reexp[#reexp + 1] = { name = orig, src = gspec }
+        else
+          names[exported] = true
+        end
+      end
+    end
+  end
+
+  -- jsExports parses a module's exports: names set, `export *` specs,
+  -- and re-export lists {name, src} (`export {a} from './z'`).
+  -- Specs live inside strings, so they are read from the raw line once
+  -- the masked line proves a real statement (never the reverse).
+  local function jsExports(content)
+    local pm = " " .. maskContent(content) .. " "
+    local names, stars, reexp = {}, {}, {}
+    if pm:find("export%s+default[^%w_]") then names["default"] = true end
+    for fn in pm:gmatch("[^%w_]export%s+function%s*%*?%s*([%w_]+)") do names[fn] = true end
+    for fn in pm:gmatch("[^%w_]export%s+async%s+function%s*%*?%s*([%w_]+)") do names[fn] = true end
+    for cn in pm:gmatch("[^%w_]export%s+abstract%s+class%s+([%w_]+)") do names[cn] = true end
+    for cn in pm:gmatch("[^%w_]export%s+class%s+([%w_]+)") do names[cn] = true end
+    for _, dk in ipairs({ "const", "let", "var", "enum", "interface", "type", "namespace" }) do
+      for dn in pm:gmatch("[^%w_]export%s+" .. dk .. "%s+([%w_]+)") do names[dn] = true end
+      for dl in pm:gmatch("[^%w_]export%s+" .. dk .. "%s*{([^}]*)}") do
+        for id in dl:gmatch("[%w_]+") do names[id] = true end
+      end
+    end
+    -- Export lists and star re-exports, line by line. `export const {` /
+    -- `export type {` destructured declarations are handled by the loops
+    -- above (`export type {A}` counts as a plain list);
+    -- `export * as ns from` re-exports only ns, so it is not chased.
+    local inBlock, acc, start = false, nil, 1
+    while true do
+      local nl = content:find("\n", start, true)
+      local raw = nl and content:sub(start, nl - 1) or content:sub(start)
+      local cline = raw
+      if inBlock then
+        local close = cline:find("*/", 1, true)
+        if close then
+          cline = string.rep(" ", close + 1) .. cline:sub(close + 2)
+          inBlock = false
+        else
+          cline = ""
+        end
+      end
+      if not inBlock then
+        local open = cline:find("/*", 1, true)
+        if open then
+          local close = cline:find("*/", open + 2, true)
+          if close then
+            cline = cline:sub(1, open - 1) .. string.rep(" ", close + 2 - open) .. cline:sub(close + 2)
+          else
+            cline = cline:sub(1, open - 1)
+            inBlock = true
+          end
+        end
+      end
+      if cline ~= "" then
+        local mline = maskSeg(cline)
+        if mline:find("export%s*%*%s*from") then
+          local sspec = cline:match("export%s*%*%s*from%s*\"([^\"]+)\"")
+            or cline:match("export%s*%*%s*from%s*'([^']+)'")
+          if sspec then stars[#stars + 1] = sspec end
+        end
+        if acc then
+          local close = mline:find("}", 1, true)
+          if close then
+            emitExportList(acc .. mline:sub(1, close - 1),
+              mline:sub(close + 1), cline:sub(close + 1), names, reexp)
+            acc = nil
+          else
+            acc = acc .. mline
+          end
+        else
+          local os, oe = mline:find("export%s*{")
+          -- `export const {` & co. are declarations (handled above);
+          -- `export type {A}` is a plain export list.
+          if os and (not mline:find("export%s+%w+%s*{") or mline:find("export%s+type%s*{")) then
+            local after, rafter = mline:sub(oe + 1), cline:sub(oe + 1)
+            local close = after:find("}", 1, true)
+            if close then
+              emitExportList(after:sub(1, close - 1),
+                after:sub(close + 1), rafter:sub(close + 1), names, reexp)
+            else
+              acc = after
+            end
+          end
+        end
+      end
+      if not nl then break end
+      start = nl + 1
+    end
+    return { names = names, stars = stars, reexp = reexp }
+  end
+
+  local function jsHasExport(content, name, fromDir, depth, seen)
+    local ex = jsExports(content)
+    if ex.names[name] then return true end
+    if depth >= 4 then return false end
+    for _, r in ipairs(ex.reexp) do
+      if r.name == name then
+        local nrel, ncontent = resolveJs(r.src, fromDir)
+        if ncontent and not seen[nrel] then
+          seen[nrel] = true
+          if jsHasExport(ncontent, name, targetDirOf(nrel), depth + 1, seen) then
+            return true
+          end
+        end
+      end
+    end
+    for _, s in ipairs(ex.stars) do
+      local nrel, ncontent = resolveJs(s, fromDir)
+      if ncontent and not seen[nrel] then
+        seen[nrel] = true
+        if jsHasExport(ncontent, name, targetDirOf(nrel), depth + 1, seen) then
+          return true
+        end
+      end
+    end
+    return false
+  end
+
+  -- pyDefs collects importable module-level names: every def/class
+  -- (any indent: methods share names, and try/except shims define at
+  -- indent 1) plus assignments at indent width <= 4 (top level and
+  -- try/except fallbacks; deeper function locals are excluded).
+  local function pyDefs(content)
+    local names = {}
+    local inStr = false
+    local start = 1
+    while true do
+      local nl = content:find("\n", start, true)
+      local raw = nl and content:sub(start, nl - 1) or content:sub(start)
+      local line = raw
+      if inStr then
+        local q1 = line:find('"""', 1, true)
+        local q2 = line:find("'''", 1, true)
+        local q = q1 and q2 and math.min(q1, q2) or (q1 or q2)
+        if q then
+          inStr = false
+          line = line:sub(q + 3)
+        else
+          line = ""
+        end
+      end
+      if not inStr then
+        local code = line:gsub("#.*$", "")
+        local triple = 0
+        for _ in code:gmatch('"""') do triple = triple + 1 end
+        for _ in code:gmatch("'''") do triple = triple + 1 end
+        local head = code
+        if triple % 2 == 1 then
+          inStr = true
+          local q1 = code:find('"""', 1, true)
+          local q2 = code:find("'''", 1, true)
+          local q = q1 and q2 and math.min(q1, q2) or (q1 or q2)
+          head = code:sub(1, q - 1)
+        end
+        local indent = head:match("^(%s*)") or ""
+        local fn = head:match("^%s*def%s+([%w_]+)")
+          or head:match("^%s*async%s+def%s+([%w_]+)")
+        if fn then
+          names[fn] = true
+        else
+          local cl = head:match("^%s*class%s+([%w_]+)")
+          if cl then
+            names[cl] = true
+          elseif #indent <= 4 then
+            local v = head:match("^%s*([%w_]+)%s*:?%s*=%s*[^=]")
+              or head:match("^%s*([%w_]+)%s*:=")
+            if v then names[v] = true end
+          end
+        end
+      end
+      if not nl then break end
+      start = nl + 1
+    end
+    return names
+  end
+
+  -- resolvePyModule finds a same-or-below-dir module file for `from .`
+  -- style specs. `dotted` uses dots ("a.b"), `level` counts leading
+  -- dots (1 = buffer dir). Returns relpath + content or nil.
+  local function resolvePyModule(dotted, level)
+    local ups = {}
+    for _ = 2, level do ups[#ups + 1] = ".." end
+    local prefix = table.concat(ups, "/")
+    local modpath = dotted:gsub("%.", "/")
+    local base = (prefix == "" and modpath) or (prefix .. "/" .. modpath)
+    for _, c in ipairs({ base .. ".py", base .. "/__init__.py" }) do
+      local norm = joinNorm(c)
+      if norm then
+        local content = readCached(norm)
+        if content then return norm, content end
+      end
+    end
+    return nil
+  end
+
   -- Unused imports, checked once at EOF.
   for name, rec in pairs(importBy) do
     if not rec.used then
-      findings[#findings + 1] = { line = rec.line, msg = "unused import '" .. name .. "'" }
+      findings[#findings + 1] = { line = rec.line, msg = "unused import '" .. name .. "'", sev = "warning" }
+    end
+  end
+  -- jsSkippedSpec: specs we must stay silent on. Bare specifiers
+  -- (node_modules, aliases) and explicit non-code extensions (.json,
+  -- .css) are unreadable by design; flagging them would false-positive.
+  -- A missing relative code file, in contrast, is a real error.
+  local function jsSkippedSpec(spec)
+    if spec:sub(1, 1) ~= "." then return true end
+    local base = spec:gsub("^%./", "")
+    local ext = base:match("%.([%w]+)$")
+    if ext then
+      for _, e in ipairs(jsExts) do
+        if ("." .. ext) == e then return false end
+      end
+      return true
+    end
+    return false
+  end
+  -- Unresolvable imports (direction 2): the bound name must exist in
+  -- the source module. Skipped specs stay silent; missing relative
+  -- targets are real errors (version drift), except namespace-package
+  -- dirs (no __init__.py), which read_file cannot see: known limitation.
+  if canRead then
+    for name, rec in pairs(importBy) do
+      local spec = importSrc[name]
+      if spec then
+        local found = nil -- nil = skipped, true/false = checked
+        if cfg.lang == "js" or cfg.lang == "ts" then
+          if not jsSkippedSpec(spec.src) then
+            if spec.rname == "*" then
+              found = resolveJs(spec.src, "") ~= nil
+            else
+              local rel, content = resolveJs(spec.src, "")
+              if content then
+                found = jsHasExport(content, spec.rname, targetDirOf(rel), 0, { [rel] = true })
+              else
+                found = false
+              end
+            end
+          end
+        elseif cfg.lang == "py" then
+          local dots, rest = spec.src:match("^(%.+)(.*)$")
+          if dots then
+            if rest == "" then
+              -- `from . import mod`: the name itself is the module.
+              found = resolvePyModule(name, #dots) ~= nil
+            else
+              local _, content = resolvePyModule(rest, #dots)
+              if content then
+                found = pyDefs(content)[spec.rname] == true
+              else
+                found = false
+              end
+            end
+          end
+        end
+        -- Go imports are package paths: out of scope (the compiler owns that).
+        if found == false then
+          findings[#findings + 1] = { line = rec.line,
+            msg = "unresolved import '" .. spec.rname .. "' from '" .. spec.src .. "'", sev = "error" }
+        end
+      end
     end
   end
   return findings
@@ -711,9 +1306,9 @@ function check()
   if lang then
     local cfg = cfgFor(lang)
     if cfg then
-      local findings = analyzeImports(scan(content, cfg), cfg)
+      local findings = analyzeImports(scan(content, cfg), cfg, path)
       for _, f in ipairs(findings) do
-        diags[#diags + 1] = { line = f.line, message = f.msg, severity = "warning" }
+        diags[#diags + 1] = { line = f.line, message = f.msg, severity = f.sev or "warning" }
       end
     end
   end
