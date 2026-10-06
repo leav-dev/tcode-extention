@@ -91,8 +91,43 @@ reporta que **no detecta etiquetas HTML no cerradas** (ej: `<div>` sin
 ### Plan de implementación v4
 
 1. [x] Actualizar documento de feature
-2. [ ] Implementar detección de etiquetas mal formadas
-3. [ ] Implementar detección de atributos mal formados
-4. [ ] Implementar detección de DOCTYPE y estructura
-5. [ ] Actualizar README.md
-6. [ ] Commit
+2. [x] Implementar detección de etiquetas mal formadas
+3. [x] Implementar detección de atributos mal formados
+4. [x] Implementar detección de DOCTYPE y estructura
+5. [x] Actualizar README.md
+6. [x] Commit (`ca28467`)
+
+---
+
+## v5: Registro de checks por lenguaje
+
+### Decisión de producto
+
+Reemplazar el filtro HTML hardcodeado (`isHTMLFile`) por un registro
+extensible consistente con `undefined-vars` / `unused-imports`:
+
+- `detectLanguage(path)` mapea extensión → `html` / `go` / `ts` / `py` / `nil`.
+- `universalChecks` corre siempre (`balanceCheck`).
+- `checksByLang[lang]` corre solo si el lenguaje se detecta.
+- Hoy: `html = { htmlTagCheck }`; `go`, `ts`, `py` vacíos (reservados).
+
+### Bugfixes encontrados por el harness
+
+- Atributos duplicados no se detectaban (se registraba solo la primera letra
+y `attrName` no se reseteaba).
+- `class=>` reportaba el mensaje dos veces.
+- `< div>` reportaba `Malformed tag` + `Empty tag` redundante.
+
+### Plan v5
+
+1. [x] Refactor `detectLanguage()` + `checksByLang` + `universalChecks`
+2. [x] `parseAttrs()` dedicado: duplicados, valores sin comilla, booleanos
+3. [x] Harness Go (gopher-lua) con 25 casos — 25/25 PASS
+4. [x] Actualizar README
+5. [ ] Commit del refactor
+
+### Evidencia v5
+
+- Harness: `go run .` en harness temporal con gopher-lua v1.1.2, 25 casos,
+  0 fallas. Cubre HTML, Go, JS/TS, Python, extensión desconocida, mayúsculas,
+  atributos multilínea y booleanos.
