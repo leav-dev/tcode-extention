@@ -1,0 +1,22 @@
+{
+  "id": "tcode.angular21lint",
+  "name": "Angular 21 Lint",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.angular21lint.check",
+        "title": "Check Angular 21 compatibility",
+        "script": "main.lua",
+        "fn": "check"
+      }
+    ],
+    "keybindings": [
+      { "key": "alt+shift+2", "command": "tcode.angular21lint.check" }
+    ],
+    "hooks": [
+      { "event": "onDidSaveBuffer", "command": "tcode.angular21lint.check" }
+    ]
+  }
+}

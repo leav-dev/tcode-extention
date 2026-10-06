@@ -41,6 +41,8 @@ from this repo directly.
 | [undefined-vars](undefined-vars/) | `tcode.undefinedvars` | **Undefined Variables**: scope analysis for Go/JS/TS/Python (warning), package-wide in Go (sibling files) |
 | [unused-imports](unused-imports/) | `tcode.unusedimports` | **Unused Imports**: import bindings never used (warning), incl. type-only usage in TS |
 | [git-changes](git-changes/) | `tcode.gitchanges` | **Git Changes**: status summary in status bar (files + lines), gutter markers for added/deleted/modified lines |
+| [angular8-lint](angular8-lint/) | `tcode.angular8lint` | **Angular 8 Lint**: flags post-v8 syntax (standalone, signals, native control flow, `input()`/`output()`, `@defer`) as `error` |
+| [angular21-lint](angular21-lint/) | `tcode.angular21lint` | **Angular 21 Lint**: flags legacy patterns (`NgModule`, `@Input`/`@Output`, `*ngIf`/`*ngFor`, View Engine) as `warning`/`error` |
 
 The linter trio replaces the former unified Code Linter; the editor **merges** the markers of every extension (per-provider diagnostics). Each extension is its own git repo with its README and manifest.
 

@@ -1,0 +1,22 @@
+{
+  "id": "tcode.angular8lint",
+  "name": "Angular 8 Lint",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.angular8lint.check",
+        "title": "Check Angular 8 compatibility",
+        "script": "main.lua",
+        "fn": "check"
+      }
+    ],
+    "keybindings": [
+      { "key": "alt+shift+8", "command": "tcode.angular8lint.check" }
+    ],
+    "hooks": [
+      { "event": "onDidSaveBuffer", "command": "tcode.angular8lint.check" }
+    ]
+  }
+}
