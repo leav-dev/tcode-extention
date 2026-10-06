@@ -43,6 +43,7 @@ from this repo directly.
 | [git-changes](git-changes/) | `tcode.gitchanges` | **Git Changes**: status summary in status bar (files + lines), gutter markers for added/deleted/modified lines |
 | [angular8-lint](angular8-lint/) | `tcode.angular8lint` | **Angular 8 Lint**: flags post-v8 syntax (standalone, signals, native control flow, `input()`/`output()`, `@defer`) as `error` |
 | [angular21-lint](angular21-lint/) | `tcode.angular21lint` | **Angular 21 Lint**: flags legacy patterns (`NgModule`, `@Input`/`@Output`, `*ngIf`/`*ngFor`, View Engine) as `warning`/`error` |
+| [data-lint](data-lint/) | `tcode.datalint` | **Data Lint**: syntax + structure for YAML/JSON/XML (duplicate keys as `warning`, broken syntax as `error`) |
 
 The linter trio replaces the former unified Code Linter; the editor **merges** the markers of every extension (per-provider diagnostics). Each extension is its own git repo with its README and manifest.
 

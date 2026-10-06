@@ -1,0 +1,22 @@
+{
+  "id": "tcode.datalint",
+  "name": "Data Lint",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.datalint.check",
+        "title": "Check data errors",
+        "script": "main.lua",
+        "fn": "check"
+      }
+    ],
+    "keybindings": [
+      { "key": "alt+shift+d", "command": "tcode.datalint.check" }
+    ],
+    "hooks": [
+      { "event": "onDidSaveBuffer", "command": "tcode.datalint.check" }
+    ]
+  }
+}
