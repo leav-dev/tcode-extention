@@ -252,6 +252,42 @@ local function analyzeScope(toks, cfg)
       pendingParams = nil
     end
   end
+  -- scanAfterParams looks past a `)` closing a JS/TS param group.
+  -- Returns kind, pos where kind is:
+  --   "body"  -> pos at `{` starting a block body
+  --   "arrow" -> pos at `=` of `=>`
+  --   "end"   -> pos at `;` (declaration without body: overloads)
+  --   nil     -> anything else (plain call)
+  -- An optional TS return-type annotation (`: type`) is skipped,
+  -- bracket-aware over (), [], <>. A top-level `{` is taken as the body
+  -- block; a bare object return type (`): {a: number} {`) is a known
+  -- limitation (params may flag there).
+  local function scanAfterParams(endj)
+    local k = endj + 1
+    if isSym(k, "{") then return "body", k end
+    if isSym(k, "=") and isSym(k + 1, ">") then return "arrow", k end
+    if not isSym(k, ":") then return nil end
+    local depth = 0
+    local j = k + 1
+    while toks[j] do
+      local t = toks[j]
+      if t.t == "sym" then
+        local w = t.w
+        if w == "(" or w == "[" or w == "<" then
+          depth = depth + 1
+        elseif w == ")" or w == "]" or w == ">" then
+          depth = math.max(depth - 1, 0)
+        elseif depth == 0 then
+          if w == "{" then return "body", j end
+          if w == "=" and isSym(j + 1, ">") then return "arrow", j end
+          if w == ";" then return "end", j end
+          if w == "," or w == "=" then return nil end
+        end
+      end
+      j = j + 1
+    end
+    return nil
+  end
 
   -- Go: package-level names are visible file-wide (order-independent) AND
   -- across the files of the same package (siblings via tcode.dir_files).
@@ -346,6 +382,13 @@ local function analyzeScope(toks, cfg)
       if isId(k) then
         define(toks[k].w)
         k = k + 1
+      end
+      if isSym(k, "[") then
+        -- Generic type params: func f[T any](x T). Constraints are
+        -- over-collected as names (harmless: only suppresses warnings).
+        local tids, tendj = readGroup(toks, k, "[", "]")
+        for _, t in ipairs(tids) do params[#params + 1] = t end
+        k = tendj + 1
       end
       if isSym(k, "(") then
         ids, endj = readGroup(toks, k, "(", ")")
@@ -452,6 +495,15 @@ local function analyzeScope(toks, cfg)
         define(toks[k].w)
       end
       return j + 2
+    elseif w == "catch" then
+      -- catch (e) { ... }: e is a definition scoped to the catch block.
+      local k = j + 1
+      if isSym(k, "(") then
+        local ids, endj = readGroup(toks, k, "(", ")")
+        pendingParams = ids
+        return endj + 1
+      end
+      return j + 1
     elseif w == "type" or w == "interface" then
       if isId(j + 1) then define(toks[j + 1].w) end
       return j + 2
@@ -692,6 +744,29 @@ local function analyzeScope(toks, cfg)
       elseif isSym(i - 1, ".") then
         -- member selector after an expression (fn().prop, arr[i].prop)
         i = i + 1
+      elseif (cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, "(") then
+        local mids, mendj = readGroup(toks, i + 1, "(", ")")
+        local kind, kpos = scanAfterParams(mendj)
+        if kind == "body" then
+          -- Shorthand method definition: the name and its params are
+          -- definitions, not usages. `{` is left for the main loop,
+          -- which pushes the body scope and defines the params there.
+          define(w)
+          pendingParams = mids
+          i = kpos
+        elseif kind == "end" then
+          -- Overload/declare signature: a name definition without body.
+          -- The annotation is skipped so type names never flag.
+          define(w)
+          pendingParams = nil
+          i = kpos
+        else
+          -- Plain call: same usage check as the fallthrough below.
+          if not (defined(w) or wildcard) then
+            findings[#findings + 1] = { line = tok.line, msg = "undefined '" .. w .. "'" }
+          end
+          i = i + 1
+        end
       elseif isSym(i + 1, ".") then
         -- member chain: only the base is a variable
         local name = w
@@ -721,10 +796,16 @@ local function analyzeScope(toks, cfg)
       elseif tok.w == "(" then
         if cfg.lang == "js" or cfg.lang == "ts" then
           local ids, endj = readGroup(toks, i, "(", ")")
-          if isSym(endj + 1, "=") and isSym(endj + 2, ">") then
+          -- Arrow params, with optional TS return type in between.
+          if scanAfterParams(endj) == "arrow" then
             for _, p in ipairs(ids) do define(p) end
           end
         end
+        i = i + 1
+      elseif tok.w == ";" then
+        -- A `;` ends any declaration: drop params of bodyless
+        -- overloads so they never leak into an unrelated `{` below.
+        pendingParams = nil
         i = i + 1
       elseif tok.w == "=" then
         if cfg.lang == "py" then
