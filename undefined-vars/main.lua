@@ -655,10 +655,20 @@ local function analyzeScope(toks, cfg)
             defineImport(t.w)
             k = k + 1
           end
-        elseif t.t == "sym" and t.w == "." then
+        elseif t.t == "sym" and (t.w == "." or t.w == ",") then
           k = k + 1
         elseif t.t == "nl" then
-          break
+          -- Comma/backslash continuation: a `nl` right after `,`
+          -- continues the name list (`import os, \n sys`; the `\`
+          -- itself emits no token). Any other `nl` ends the statement.
+          local p = k - 1
+          while p >= 1 and toks[p].t == "nl" do p = p - 1 end
+          local pt = toks[p]
+          if pt and pt.t == "sym" and pt.w == "," then
+            k = k + 1
+          else
+            break
+          end
         else
           break
         end
@@ -671,10 +681,28 @@ local function analyzeScope(toks, cfg)
         k = k + 1
       end
       k = k + 1
+      local depth = 0
       while toks[k] do
         local t = toks[k]
-        if t.t == "str" or t.t == "nl" then break end
-        if t.t == "id" then
+        if t.t == "str" then break end
+        if t.t == "nl" then
+          -- Inside `(...)` newlines are continuations; outside, only a
+          -- trailing `,` (or its `\` form, which emits no token)
+          -- continues. Any other `nl` ends the statement so the next
+          -- line is never swallowed as an import name.
+          if depth > 0 then
+            k = k + 1
+          else
+            local p = k - 1
+            while p >= 1 and toks[p].t == "nl" do p = p - 1 end
+            local pt = toks[p]
+            if pt and pt.t == "sym" and pt.w == "," then
+              k = k + 1
+            else
+              break
+            end
+          end
+        elseif t.t == "id" then
           if t.w == "as" then
             if isId(k + 1) then defineImport(toks[k + 1].w) end
             k = k + 2
@@ -682,7 +710,9 @@ local function analyzeScope(toks, cfg)
             defineImport(t.w)
             k = k + 1
           end
-        elseif t.t == "sym" and t.w == "," then
+        elseif t.t == "sym" and (t.w == "," or t.w == "(" or t.w == ")") then
+          if t.w == "(" then depth = depth + 1 end
+          if t.w == ")" then depth = math.max(depth - 1, 0) end
           k = k + 1
         else
           break
@@ -756,6 +786,9 @@ local function analyzeScope(toks, cfg)
       elseif (cfg.lang == "go" or cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, ":") then
         -- go x := ; js/ts {key: v} or annotation: not a usage
         i = i + 1
+      elseif isSym(i - 1, ".") then
+        -- member selector after an expression (fn().prop, arr[i].prop)
+        i = i + 1
       elseif isSym(i + 1, ",") then
         -- multi-target decl (go a, b := ; py a, b =) vs call args (fn(a, b))
         local j = i + 1
@@ -801,9 +834,6 @@ local function analyzeScope(toks, cfg)
         i = i + 1
       elseif isSym(i - 1, ":") then
         -- annotation types: not usages
-        i = i + 1
-      elseif isSym(i - 1, ".") then
-        -- member selector after an expression (fn().prop, arr[i].prop)
         i = i + 1
       elseif (cfg.lang == "js" or cfg.lang == "ts") and (isSym(i + 1, "(") or isSym(i + 1, "<")) then
         -- Shorthand method definition, optionally generic (`foo<T>(...)`).

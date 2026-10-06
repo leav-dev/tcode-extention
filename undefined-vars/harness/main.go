@@ -111,6 +111,17 @@ func main() {
 		{name: "ts tparam constraint", path: "a.ts", content: "function foo<T extends (...args: any[]) => any>(x: T): T {\n  return x;\n}\n"},
 		{name: "ts trailing comma", path: "a.tsx", content: "const f = <T,>(x: T): T => x;\n"},
 		{name: "go funclit", path: "a.go", content: "package m\nvar f = func(x int) int {\n    return x\n}\n"},
+		{name: "py member chain trailing comma", path: "a.py", content: "from rest_framework import status\n{'status': status.HTTP_200_OK,}\n"},
+		{name: "py loop member trailing comma", path: "a.py", content: "snaps = []\nfor snap in snaps:\n    d = {'grupo_id': snap.grupo_id,}\n"},
+		{name: "py undef base trailing comma", path: "a.py", content: "x = foo.bar,\n", want: []string{"1:warning:undefined 'foo'"}},
+		{name: "py from multiline parens", path: "a.py", content: "from .models import (\n    A,\n    B,\n)\nprint(A)\nprint(B)\n"},
+		{name: "py from single multi", path: "a.py", content: "from .models import A, B\nprint(A)\nprint(B)\n"},
+		{name: "py from alias", path: "a.py", content: "from x import y as z\nprint(z)\n"},
+		{name: "py import comma", path: "a.py", content: "import os, sys\nprint(os)\nprint(sys)\n"},
+		{name: "py import backslash cont", path: "a.py", content: "import os, \\\n    sys\nprint(os)\nprint(sys)\n"},
+		{name: "js multiline import", path: "a.js", content: "import {\n  A,\n  B\n} from 'm';\nconsole.log(A, B);\n"},
+		{name: "go multiline import", path: "a.go", content: "package m\nimport (\n  \"fmt\"\n  alias \"x/y\"\n)\nfunc f() {\n  fmt.Println(alias.V)\n}\n"},
+		{name: "py truly undef", path: "a.py", content: "print(nope)\n", want: []string{"1:warning:undefined 'nope'"}},
 	}
 	failures := 0
 	for _, tc := range cases {
