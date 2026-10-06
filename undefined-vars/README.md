@@ -36,6 +36,7 @@ analyzed by this extension (no scope rules for them in v1).
 - Selector/member access checks only the base (`pkg.Fn` → `pkg`); properties
   after calls (`get().prop`) are not variables.
 - py uses a single file scope (no indentation); forward references in py can
-  warn. TS generics may false-positive.
+  warn. TS generics (`<T>`, constraints, generic classes/methods/arrows)
+  are supported; JSX markup in `.tsx` still flags (no tag awareness).
 - Every message is English. The config tables build lazily per language
   (RAM-min).

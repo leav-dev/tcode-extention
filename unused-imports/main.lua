@@ -75,7 +75,7 @@ local function scan(content, cfg)
   local syms = {
     ["("] = true, [")"] = true, ["["] = true, ["]"] = true, ["{"] = true,
     ["}"] = true, ["."] = true, [","] = true, [":"] = true, ["="] = true,
-    [";"] = true, ["+"] = true, [">"] = true,
+    [";"] = true, ["+"] = true, [">"] = true, ["<"] = true,
   }
   local function push(t, w)
     toks[#toks + 1] = { t = t, w = w, line = line }
@@ -220,6 +220,15 @@ local function analyzeImports(toks, cfg, path)
     local r = importBy[name]
     if r then r.used = true end
   end
+  -- defineUsed defines a type param AND marks it used: constraints
+  -- (`<T extends Base>`) reference imports. Shadowing an import name
+  -- with a type param hides it (accepted, silent, rare).
+  local function defineUsed(name)
+    if name and name ~= "" and not cfg.keywords[name] and not cfg.builtins[name] then
+      cur()[name] = true
+      markUsed(name)
+    end
+  end
   local function readGroup(list, j, openCh, closeCh)
     local ids = {}
     local depth = 1
@@ -250,6 +259,34 @@ local function analyzeImports(toks, cfg, path)
       end
       pendingParams = nil
     end
+  end
+  -- readAngle collects the ids in a balanced `<...>` group starting at
+  -- ii (at `<`): TS type params and friends. `=>` pairs are skipped so
+  -- function-type constraints don't end the group early. Returns ids and
+  -- the index after the matching `>`, or nil when unbalanced.
+  local function readAngle(ii)
+    local ids, depth = {}, 1
+    local k = ii + 1
+    while toks[k] do
+      local t = toks[k]
+      if t.t == "sym" and t.w == "=" and toks[k + 1]
+        and toks[k + 1].t == "sym" and toks[k + 1].w == ">" then
+        k = k + 2 -- `=>` inside a constraint: not a closer
+      else
+        if t.t == "sym" then
+          if t.w == "<" then
+            depth = depth + 1
+          elseif t.w == ">" then
+            depth = depth - 1
+            if depth == 0 then return ids, k + 1 end
+          end
+        elseif t.t == "id" then
+          ids[#ids + 1] = t.w
+        end
+        k = k + 1
+      end
+    end
+    return nil
   end
   -- scanAfterParams looks past a `)` closing a JS/TS param group.
   -- Returns kind, pos: "body" (pos at `{`), "arrow" (pos at `=` of
@@ -414,6 +451,13 @@ local function analyzeImports(toks, cfg, path)
         define(toks[k].w)
         k = k + 1
       end
+      if isSym(k, "<") then
+        local tids, kend = readAngle(k)
+        if tids and isSym(kend, "(") then
+          for _, t in ipairs(tids) do defineUsed(t) end
+          k = kend
+        end
+      end
       if isSym(k, "(") then
         ids, endj = readGroup(toks, k, "(", ")")
         pendingParams = ids
@@ -424,8 +468,17 @@ local function analyzeImports(toks, cfg, path)
       local k = j + 1
       if isId(k) then
         define(toks[k].w)
+        k = k + 1
+        if isSym(k, "<") then
+          local tids, kend = readAngle(k)
+          if tids then
+            for _, t in ipairs(tids) do defineUsed(t) end
+            k = kend
+          end
+        end
+        return k
       end
-      return j + 2
+      return j + 1 -- anonymous: let `{` push its scope normally
     elseif w == "catch" then
       -- catch (e) { ... }: e is scoped to the catch block.
       local k = j + 1
@@ -436,8 +489,20 @@ local function analyzeImports(toks, cfg, path)
       end
       return j + 1
     elseif w == "type" or w == "interface" then
-      if isId(j + 1) then define(toks[j + 1].w) end
-      return j + 2
+      local k = j + 1
+      if isId(k) then
+        define(toks[k].w)
+        k = k + 1
+        if isSym(k, "<") then
+          local tids, kend = readAngle(k)
+          if tids then
+            for _, t in ipairs(tids) do defineUsed(t) end
+            k = kend
+          end
+        end
+        return k
+      end
+      return j + 1
     elseif w == "let" or w == "const" or w == "var" then
       local k = j + 1
       local depth = 0
@@ -752,19 +817,41 @@ local function analyzeImports(toks, cfg, path)
         i = i + 1
       elseif isSym(i - 1, ".") then
         i = i + 1 -- member selector after an expression: never the binding
-      elseif (cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, "(") then
-        local mids, mendj = readGroup(toks, i + 1, "(", ")")
-        local kind, kpos = scanAfterParams(mendj)
-        if kind == "body" then
-          -- Shorthand method definition: name + params are definitions.
+      elseif (cfg.lang == "js" or cfg.lang == "ts") and (isSym(i + 1, "(") or isSym(i + 1, "<")) then
+        -- Shorthand method definition, optionally generic (`foo<T>(...)`).
+        -- A failed match (e.g. a comparison) falls back to the plain
+        -- usage check below with the index untouched.
+        local mkind, mafter, mparams = nil, nil, nil
+        do
+          local k = i + 1
+          local tparams = nil
+          if isSym(k, "<") then
+            local tids, kend = readAngle(k)
+            if not (tids and isSym(kend, "(")) then
+              tparams = false -- not type args: plain usage path
+            else
+              tparams = tids
+              k = kend
+            end
+          end
+          if tparams ~= false and isSym(k, "(") then
+            local mids, mendj = readGroup(toks, k, "(", ")")
+            local kind, kpos = scanAfterParams(mendj)
+            if kind == "body" or kind == "end" then
+              mkind, mafter, mparams = kind, kpos, { t = tparams or {}, v = mids }
+            end
+          end
+        end
+        if mkind == "body" then
           define(w)
-          pendingParams = mids
-          i = kpos
-        elseif kind == "end" then
-          -- Overload/declare signature: name definition, skip annotation.
+          for _, t in ipairs(mparams.t) do defineUsed(t) end
+          pendingParams = mparams.v
+          i = mafter
+        elseif mkind == "end" then
           define(w)
+          for _, t in ipairs(mparams.t) do defineUsed(t) end
           pendingParams = nil
-          i = kpos
+          i = mafter
         else
           -- Plain call: the callee is a usage.
           if defined(w) then markUsed(w) end
@@ -796,6 +883,18 @@ local function analyzeImports(toks, cfg, path)
           -- Arrow params, with optional TS return type in between.
           if scanAfterParams(endj) == "arrow" then
             for _, p in ipairs(ids) do define(p) end
+          end
+        end
+        i = i + 1
+      elseif tok.w == "<" and (cfg.lang == "js" or cfg.lang == "ts") then
+        -- Possible generic arrow `<T>(x) =>`: define the type params now
+        -- (they are visited before the `(` handler confirms the arrow).
+        -- Anything else falls through untouched.
+        local tids, kend = readAngle(i)
+        if tids and isSym(kend, "(") then
+          local _, gend = readGroup(toks, kend, "(", ")")
+          if scanAfterParams(gend) == "arrow" then
+            for _, t in ipairs(tids) do defineUsed(t) end
           end
         end
         i = i + 1

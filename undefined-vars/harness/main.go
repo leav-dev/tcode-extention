@@ -98,6 +98,18 @@ func main() {
 		{name: "ts arrow ret type", path: "a.ts", content: "const f = (x: number): number => x + 1;\n"},
 		{name: "ts method generic ret", path: "a.ts", content: "class A {\n  foo(x: number): Array<string> {\n    return [x];\n  }\n}\n"},
 		{name: "ts abstract method", path: "a.ts", content: "abstract class A {\n  abstract foo(x: number): void;\n}\n"},
+		{name: "ts generic fn", path: "a.ts", content: "function foo<T>(x: T): T {\n  return x;\n}\n"},
+		{name: "ts generic method", path: "a.ts", content: "class A {\n  foo<T>(x: T): T {\n    return x;\n  }\n}\n"},
+		{name: "ts generic arrow", path: "a.ts", content: "const f = <T>(x: T): T => x;\n"},
+		{name: "ts generic class", path: "a.ts", content: "class Box<T> {\n  v!: T;\n  get(): T {\n    return this.v;\n  }\n}\n"},
+		{name: "ts explicit targs", path: "a.ts", content: "declare function foo<T>(x: T): T;\nfoo<string>('a');\n"},
+		{name: "ts ctor private", path: "a.ts", content: "import { Svc } from './svc';\nclass A {\n  constructor(private svc: Svc) {\n    svc.go();\n  }\n}\n"},
+		{name: "ts as-expr", path: "a.ts", content: "const x = 1;\nconst y = x as string;\n"},
+		{name: "ts targs call", path: "a.ts", content: "import { T } from './t';\ndeclare function foo<U>(x: U): U;\nfoo<T>('a');\n"},
+		{name: "ts extends generic", path: "a.ts", content: "import { B } from './b';\nclass A<T> extends B<T> {\n  v!: T;\n}\n"},
+		{name: "ts anon class", path: "a.ts", content: "export default class {\n  foo(x) {\n    return x;\n  }\n}\nconst y = 1;\n"},
+		{name: "ts tparam constraint", path: "a.ts", content: "function foo<T extends (...args: any[]) => any>(x: T): T {\n  return x;\n}\n"},
+		{name: "ts trailing comma", path: "a.tsx", content: "const f = <T,>(x: T): T => x;\n"},
 		{name: "go funclit", path: "a.go", content: "package m\nvar f = func(x int) int {\n    return x\n}\n"},
 	}
 	failures := 0

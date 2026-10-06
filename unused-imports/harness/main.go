@@ -125,6 +125,9 @@ func main() {
 		{name: "py absolute skipped", path: "proj/main.py", content: "from os import path\npath.join(\"a\")\n", want: nil, wantCall: true},
 		{name: "py alias ok", path: "proj/main.py", content: "from .helpers import helper as h\nh()\n", want: nil, wantCall: true},
 		// Go: direction 2 out of scope
+		{name: "ts generic constraint uses import", path: "proj/a.ts", content: "import { Base } from './base';\nfunction foo<T extends Base>(x: T): T {\n  return x;\n}\nfoo(new Base());\n", want: nil, wantCall: true},
+		{name: "ts generic method import", path: "proj/a.ts", content: "import { Base } from './base';\nclass A {\n  foo<T extends Base>(x: T): T {\n    return x;\n  }\n}\nnew A().foo(new Base());\n", want: nil, wantCall: true},
+		{name: "ts generic class import", path: "proj/a.ts", content: "import { Base } from './base';\nclass Box<T extends Base> {\n  v!: T;\n}\nnew Box<Base>();\n", want: nil, wantCall: true},
 		{name: "go imports skipped", path: "a.go", content: "package m\nimport \"fmt\"\nfunc f() {\n    fmt.Println(1)\n}\n", want: nil, wantCall: true},
 		// Ported param fixes (usage tracking)
 		{name: "js method param type", path: "proj/a.ts", content: "import { Config } from './types';\nclass A {\n  foo(x: Config) {\n    return x;\n  }\n}\n", want: nil, wantCall: true},

@@ -84,7 +84,7 @@ local function scan(content, cfg)
   local syms = {
     ["("] = true, [")"] = true, ["["] = true, ["]"] = true, ["{"] = true,
     ["}"] = true, ["."] = true, [","] = true, [":"] = true, ["="] = true,
-    [";"] = true, ["+"] = true, [">"] = true,
+    [";"] = true, ["+"] = true, [">"] = true, ["<"] = true,
   }
   local function push(t, w)
     toks[#toks + 1] = { t = t, w = w, line = line }
@@ -251,6 +251,36 @@ local function analyzeScope(toks, cfg)
       end
       pendingParams = nil
     end
+  end
+  -- readAngle collects the ids in a balanced `<...>` group starting at
+  -- ii (at `<`): TS type params and friends. `=>` pairs are skipped so
+  -- function-type constraints don't end the group early. Returns ids and
+  -- the index after the matching `>`, or nil when unbalanced. Callers
+  -- only invoke it in type-param positions, so comparisons never reach it
+  -- as a definition site (a failed match simply falls back to the old path).
+  local function readAngle(ii)
+    local ids, depth = {}, 1
+    local k = ii + 1
+    while toks[k] do
+      local t = toks[k]
+      if t.t == "sym" and t.w == "=" and toks[k + 1]
+        and toks[k + 1].t == "sym" and toks[k + 1].w == ">" then
+        k = k + 2 -- `=>` inside a constraint: not a closer
+      else
+        if t.t == "sym" then
+          if t.w == "<" then
+            depth = depth + 1
+          elseif t.w == ">" then
+            depth = depth - 1
+            if depth == 0 then return ids, k + 1 end
+          end
+        elseif t.t == "id" then
+          ids[#ids + 1] = t.w
+        end
+        k = k + 1
+      end
+    end
+    return nil
   end
   -- scanAfterParams looks past a `)` closing a JS/TS param group.
   -- Returns kind, pos where kind is:
@@ -483,6 +513,15 @@ local function analyzeScope(toks, cfg)
         define(toks[k].w)
         k = k + 1
       end
+      if isSym(k, "<") then
+        -- Generic function: type params define immediately (return-type
+        -- annotations precede `{` and reference them).
+        local tids, kend = readAngle(k)
+        if tids and isSym(kend, "(") then
+          for _, t in ipairs(tids) do define(t) end
+          k = kend
+        end
+      end
       if isSym(k, "(") then
         ids, endj = readGroup(toks, k, "(", ")")
         pendingParams = ids
@@ -493,8 +532,18 @@ local function analyzeScope(toks, cfg)
       local k = j + 1
       if isId(k) then
         define(toks[k].w)
+        k = k + 1
+        if isSym(k, "<") then
+          -- Generic class: immediate (extends/implements precede `{`).
+          local tids, kend = readAngle(k)
+          if tids then
+            for _, t in ipairs(tids) do define(t) end
+            k = kend
+          end
+        end
+        return k
       end
-      return j + 2
+      return j + 1 -- anonymous: let `{` push its scope normally
     elseif w == "catch" then
       -- catch (e) { ... }: e is a definition scoped to the catch block.
       local k = j + 1
@@ -505,8 +554,20 @@ local function analyzeScope(toks, cfg)
       end
       return j + 1
     elseif w == "type" or w == "interface" then
-      if isId(j + 1) then define(toks[j + 1].w) end
-      return j + 2
+      local k = j + 1
+      if isId(k) then
+        define(toks[k].w)
+        k = k + 1
+        if isSym(k, "<") then
+          local tids, kend = readAngle(k)
+          if tids then
+            for _, t in ipairs(tids) do define(t) end
+            k = kend
+          end
+        end
+        return k
+      end
+      return j + 1
     elseif w == "let" or w == "const" or w == "var" then
       local k = j + 1
       local depth = 0
@@ -744,24 +805,48 @@ local function analyzeScope(toks, cfg)
       elseif isSym(i - 1, ".") then
         -- member selector after an expression (fn().prop, arr[i].prop)
         i = i + 1
-      elseif (cfg.lang == "js" or cfg.lang == "ts") and isSym(i + 1, "(") then
-        local mids, mendj = readGroup(toks, i + 1, "(", ")")
-        local kind, kpos = scanAfterParams(mendj)
-        if kind == "body" then
-          -- Shorthand method definition: the name and its params are
-          -- definitions, not usages. `{` is left for the main loop,
-          -- which pushes the body scope and defines the params there.
+      elseif (cfg.lang == "js" or cfg.lang == "ts") and (isSym(i + 1, "(") or isSym(i + 1, "<")) then
+        -- Shorthand method definition, optionally generic (`foo<T>(...)`).
+        -- A failed match (e.g. a comparison) falls back to the plain
+        -- usage check below with the index untouched.
+        local mkind, mafter, mparams = nil, nil, nil
+        do
+          local k = i + 1
+          local tparams = nil
+          if isSym(k, "<") then
+            local tids, kend = readAngle(k)
+            if not (tids and isSym(kend, "(")) then
+              tparams = false -- not type args: plain usage path
+            else
+              tparams = tids
+              k = kend
+            end
+          end
+          if tparams ~= false and isSym(k, "(") then
+            local mids, mendj = readGroup(toks, k, "(", ")")
+            local kind, kpos = scanAfterParams(mendj)
+            if kind == "body" or kind == "end" then
+              mkind, mafter, mparams = kind, kpos, { t = tparams or {}, v = mids }
+            end
+          end
+        end
+        if mkind == "body" then
+          -- `{` is left for the main loop, which pushes the body scope
+          -- and defines the value params there. Type params define now:
+          -- return-type annotations precede `{` and reference them.
           define(w)
-          pendingParams = mids
-          i = kpos
-        elseif kind == "end" then
+          for _, t in ipairs(mparams.t) do define(t) end
+          pendingParams = mparams.v
+          i = mafter
+        elseif mkind == "end" then
           -- Overload/declare signature: a name definition without body.
           -- The annotation is skipped so type names never flag.
           define(w)
+          for _, t in ipairs(mparams.t) do define(t) end
           pendingParams = nil
-          i = kpos
+          i = mafter
         else
-          -- Plain call: same usage check as the fallthrough below.
+          -- Plain call (or comparison): usage check, index untouched.
           if not (defined(w) or wildcard) then
             findings[#findings + 1] = { line = tok.line, msg = "undefined '" .. w .. "'" }
           end
@@ -799,6 +884,19 @@ local function analyzeScope(toks, cfg)
           -- Arrow params, with optional TS return type in between.
           if scanAfterParams(endj) == "arrow" then
             for _, p in ipairs(ids) do define(p) end
+          end
+        end
+        i = i + 1
+      elseif tok.w == "<" and (cfg.lang == "js" or cfg.lang == "ts") then
+        -- Possible generic arrow `<T>(x) =>`: define the type params now
+        -- (they are visited before the `(` handler confirms the arrow).
+        -- Anything else (comparisons, calls with type args, JSX) fails
+        -- the lookahead and falls through untouched.
+        local tids, kend = readAngle(i)
+        if tids and isSym(kend, "(") then
+          local _, gend = readGroup(toks, kend, "(", ")")
+          if scanAfterParams(gend) == "arrow" then
+            for _, t in ipairs(tids) do define(t) end
           end
         end
         i = i + 1
