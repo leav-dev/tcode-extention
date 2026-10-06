@@ -2,23 +2,25 @@
 -- Muestra información de cambios de git en la barra de estado y marca
 -- las líneas con cambios en el gutter.
 --
--- Editor API: tcode.buffer(), tcode.message(), tcode.diagnostics.set/clear,
+-- Editor API: tcode.buffer(), tcode.statusBar.setSection(id, text), tcode.diagnostics.set/clear,
 -- tcode.git.status(), tcode.git.file_diff()
 --
 -- Convention: every message sent to the user is English.
 
--- status muestra un resumen de cambios de git en la barra de estado.
+-- status muestra un resumen de cambios de git en la barra de estado, en su
+-- propia sección (tcode.statusBar.setSection) para no pisar a las demás
+-- extensiones ni a los mensajes del editor.
 -- Se ejecuta al guardar el buffer (hook onDidSaveBuffer) o con alt+shift+g.
 function status()
   local path = tcode.buffer()
   if not path then
-    tcode.message("Git Changes: no active buffer")
+    tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: no active buffer")
     return
   end
 
   local git = tcode.git.status()
   if not git then
-    tcode.message("Git Changes: not a git repository")
+    tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: not a git repository")
     return
   end
 
@@ -28,7 +30,7 @@ function status()
   local total_files = staged + unstaged + untracked
 
   if total_files == 0 then
-    tcode.message("Git Changes: clean working tree")
+    tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: clean working tree")
     return
   end
 
@@ -46,7 +48,7 @@ function status()
   local file_summary = table.concat(parts, ", ")
   local line_summary = "+" .. git.added .. " -" .. git.deleted
 
-  tcode.message("Git Changes: " .. total_files .. " files (" .. file_summary .. "), " .. line_summary .. " lines")
+  tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: " .. total_files .. " files (" .. file_summary .. "), " .. line_summary .. " lines")
 end
 
 -- mark marca las líneas con cambios en el gutter usando diagnostics.
