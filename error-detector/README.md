@@ -61,3 +61,16 @@ Comments (`<!-- ... -->`) and attribute strings are ignored.
 
 Every message is English. This script is intentionally compact,
 language-agnostic, no tables — the RAM-min member of the trio.
+
+## Development
+
+A gopher-lua harness lives in [`harness/`](harness/) and mirrors the tcode
+host (a `tcode.*` stub that captures `diagnostics.set`/`clear`, then runs
+the global `check()`). Run it with:
+
+```sh
+cd harness && go run .
+```
+
+It prints one line per case and exits non-zero on any failure. Add a case to
+`buildCases()` when you add a check or fix a regression.

@@ -350,17 +350,13 @@ end
 
 -- checksByLang maps each detected language to the check functions that apply
 -- to it. A language listed here with an empty table means "no specific check
--- yet"; unknown languages fall through to universalChecks only.
+-- yet"; unknown languages get no specific check.
 local checksByLang = {
   html = { htmlTagCheck },
   go   = {},
   ts   = {},
   py   = {},
 }
-
--- universalChecks run for every buffer, regardless of language. balanceCheck
--- is deliberately language-agnostic.
-local universalChecks = { balanceCheck }
 
 function check()
   local path, content = tcode.buffer()
@@ -369,18 +365,21 @@ function check()
   end
 
   local diags = {}
-  local function collect(fn)
-    for _, e in ipairs(fn(content)) do
-      diags[#diags + 1] = { line = e.l, message = e.m, severity = "error" }
-    end
+  local lang = detectLanguage(path)
+
+  -- balanceCheck is language-agnostic: it runs for every buffer.
+  for _, e in ipairs(balanceCheck(content)) do
+    diags[#diags + 1] = { line = e.l, message = e.m, severity = "error" }
   end
 
-  for _, fn in ipairs(universalChecks) do
-    collect(fn)
-  end
-  local langChecks = checksByLang[detectLanguage(path)] or {}
-  for _, fn in ipairs(langChecks) do
-    collect(fn)
+  -- Language-specific checks run only when the language is detected.
+  local langChecks = checksByLang[lang]
+  if langChecks then
+    for _, fn in ipairs(langChecks) do
+      for _, e in ipairs(fn(content)) do
+        diags[#diags + 1] = { line = e.l, message = e.m, severity = "error" }
+      end
+    end
   end
 
   if #diags == 0 then

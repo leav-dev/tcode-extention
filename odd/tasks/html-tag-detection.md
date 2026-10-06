@@ -131,3 +131,29 @@ y `attrName` no se reseteaba).
 - Harness: `go run .` en harness temporal con gopher-lua v1.1.2, 25 casos,
   0 fallas. Cubre HTML, Go, JS/TS, Python, extensión desconocida, mayúsculas,
   atributos multilínea y booleanos.
+
+---
+
+## v6: Estructura consistente + harness en el repo
+
+### Decisión de producto
+
+Unificar la estructura del `error-detector` con las otras extensiones del
+monorepo y dejar el harness en el repo (el usuario eligió la opción A).
+
+Cambios:
+
+1. `check()` sigue el patrón de `undefined-vars` / `unused-imports`:
+   `detectLanguage` + lógica inline, sin helper `collect` ni tabla
+   `universalChecks`. `balanceCheck` se llama directo (es universal).
+2. El harness vive en `error-detector/harness/` (mismo patrón que
+   `python-lint/harness/`): `go.mod` + `main.go` con `buildCases()`.
+3. README documenta el harness y cómo correrlo.
+
+### Plan v6
+
+1. [x] Unificar `check()` con el patrón de las otras extensiones
+2. [x] Mover el harness a `error-detector/harness/`
+3. [x] Actualizar README con el harness
+4. [x] Verificar: 25 casos, 0 fallas
+5. [ ] Commit
