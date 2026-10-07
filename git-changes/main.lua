@@ -29,8 +29,16 @@ function status()
   local untracked = #git.untracked
   local total_files = staged + unstaged + untracked
 
+  -- Branch is informative: older editors do not expose it (nil), and the
+  -- editor reports "" when it cannot be determined. Both degrade to the
+  -- branchless format.
+  local scope = "Git Changes"
+  if git.branch ~= nil and git.branch ~= "" then
+    scope = scope .. " [" .. git.branch .. "]"
+  end
+
   if total_files == 0 then
-    tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: clean working tree")
+    tcode.statusBar.setSection("tcode.gitchanges", scope .. ": clean working tree")
     return
   end
 
@@ -48,7 +56,7 @@ function status()
   local file_summary = table.concat(parts, ", ")
   local line_summary = "+" .. git.added .. " -" .. git.deleted
 
-  tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: " .. total_files .. " files (" .. file_summary .. "), " .. line_summary .. " lines")
+  tcode.statusBar.setSection("tcode.gitchanges", scope .. ": " .. total_files .. " files (" .. file_summary .. "), " .. line_summary .. " lines")
 end
 
 -- mark marca las líneas con cambios en el gutter usando diagnostics.
