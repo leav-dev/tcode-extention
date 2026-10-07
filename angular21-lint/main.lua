@@ -19,6 +19,34 @@
 -- No overlap with error-detector: this extension never checks bracket
 -- balance or HTML tag balance. Those stay in tcode.errordetector.
 
+-- joinChunks concatenates a chunk array in bounded batches. table.concat in
+-- gopher-lua PUSHES every element onto the VM registry, so masking a very
+-- long line char-by-char overflows it with "registry overflow". Batching
+-- keeps each registry use well under the limit regardless of line length.
+-- Same helper as python-lint / unused-imports.
+local function joinChunks(chunks, sep)
+  local cur = chunks
+  while #cur > 400 do
+    local parts = {}
+    local n = #cur
+    local i = 1
+    while i <= n do
+      local j = i + 399
+      if j > n then j = n end
+      local batch = {}
+      local b = 1
+      for k = i, j do
+        batch[b] = cur[k]
+        b = b + 1
+      end
+      parts[#parts + 1] = table.concat(batch, sep)
+      i = j + 1
+    end
+    cur = parts -- every level joins with sep, including batch boundaries
+  end
+  return table.concat(cur, sep)
+end
+
 -- isAngularFile checks if the buffer content looks like an Angular file
 -- (component, module, service, directive, pipe) or an Angular template.
 local function isAngularFile(content)
@@ -67,7 +95,7 @@ local function maskLine(line)
       i = i + 1
     end
   end
-  return table.concat(out)
+  return joinChunks(out)
 end
 
 -- legacyCheck detects pre-standalone/deprecated Angular patterns.

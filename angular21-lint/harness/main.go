@@ -81,6 +81,12 @@ func main() {
 		{name: "ng21 ngif", path: "foo.component.html", content: "<div *ngIf=\"a\">x</div>\n", want: []string{"1:warning:legacy structural directives are deprecated in Angular 21, prefer @if/@for/@switch control flow"}},
 		{name: "ng21 viewengine", path: "foo.component.ts", content: "import { Component } from '@angular/core';\n// ViewEngine compat\n@Component({ selector: 'app-foo', template: `` })\nexport class FooComponent {}\n", want: nil, wantCall: true},
 	}
+	// Registry-overflow regression: maskLine builds one table entry per char
+	// and table.concat pushes every element onto the VM registry, so a single
+	// line past ~5KB blew up with "registry overflow" on every save.
+	cases = append(cases, testCase{name: "ng21 long line no overflow", path: "foo.component.ts",
+		content: "import { Component, input } from '@angular/core';\n@Component({ standalone: true, selector: 'app-foo', template: `` })\nexport class FooComponent { s = \"" + strings.Repeat("x", 9000) + "\"; }\n",
+		want: nil, wantCall: true})
 
 	failures := 0
 	for _, tc := range cases {

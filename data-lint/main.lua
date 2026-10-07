@@ -277,6 +277,34 @@ local function countQuote(s, q)
   return count
 end
 
+-- joinChunks concatenates a chunk array in bounded batches. table.concat in
+-- gopher-lua PUSHES every element onto the VM registry, so stripping a very
+-- long line char-by-char overflows it with "registry overflow". Batching
+-- keeps each registry use well under the limit regardless of line length.
+-- Same helper as python-lint / unused-imports.
+local function joinChunks(chunks, sep)
+  local cur = chunks
+  while #cur > 400 do
+    local parts = {}
+    local n = #cur
+    local i = 1
+    while i <= n do
+      local j = i + 399
+      if j > n then j = n end
+      local batch = {}
+      local b = 1
+      for k = i, j do
+        batch[b] = cur[k]
+        b = b + 1
+      end
+      parts[#parts + 1] = table.concat(batch, sep)
+      i = j + 1
+    end
+    cur = parts -- every level joins with sep, including batch boundaries
+  end
+  return table.concat(cur, sep)
+end
+
 -- stripSpans removes q...q spans so quotes nested inside the other quote
 -- kind are not mistaken for delimiters.
 local function stripSpans(s, q)
@@ -294,7 +322,7 @@ local function stripSpans(s, q)
       out[#out + 1] = s:sub(k, k) k = k + 1
     end
   end
-  return table.concat(out)
+  return joinChunks(out)
 end
 
 local function yamlCheck(content)

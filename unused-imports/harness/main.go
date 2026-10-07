@@ -116,6 +116,13 @@ func main() {
 		{name: "py missing file", path: "proj/main.py", content: "from .nosuch import a\na()\n", want: []string{"1:error:unresolved import 'a' from '.nosuch'"}},
 		{name: "js bare skipped", path: "proj/main.ts", content: "import { useState } from 'react';\nuseState(0);\n", want: nil, wantCall: true},
 		{name: "js reexport chase", path: "proj/main.ts", content: "import { helper } from './reexp';\nhelper();\n", want: nil, wantCall: true},
+		// Registry-overflow regressions: maskContent/maskSeg build one
+		// table entry per char and table.concat pushes every element onto
+		// the VM registry, so targets past ~5KB blew up with "registry
+		// overflow" on every save (seen live on a 7KB import target).
+		{name: "js big target no overflow", path: "proj/main.ts", content: "import { bigHelper } from './big';\nbigHelper();\n", want: nil, wantCall: true},
+		{name: "js big target missing still errors", path: "proj/main.ts", content: "import { nope } from './big';\nnope();\n", want: []string{"1:error:unresolved import 'nope' from './big'"}},
+		{name: "js long line target no overflow", path: "proj/main.ts", content: "import { wide } from './longline';\nwide;\n", want: nil, wantCall: true},
 		{name: "js both directions", path: "proj/main.ts", content: "import { nope } from './util';\n", want: []string{"1:error:unresolved import 'nope' from './util'", "1:warning:unused import 'nope'"}},
 		// Direction 2: Python
 		{name: "py from ok", path: "proj/main.py", content: "from .helpers import helper\nhelper()\n", want: nil, wantCall: true},

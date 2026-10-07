@@ -1,7 +1,7 @@
 {
   "id": "tcode.angular8lint",
   "name": "Angular 8 Lint",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "activation": ["onStartup"],
   "contributes": {
     "commands": [

@@ -83,6 +83,12 @@ func main() {
 		{name: "ng8 defer", path: "foo.component.html", content: "<div *ngIf=\"a\">x</div>\n@defer { <span>y</span> }\n", want: []string{"2:error:deferrable views are not compatible with Angular 8 (introduced in v17)"}},
 		{name: "ng8 string masked", path: "foo.component.ts", content: "import { Component } from '@angular/core';\nconst s = \"standalone: true\";\n@Component({ selector: 'app-foo', template: `` })\nexport class FooComponent {}\n", want: nil, wantCall: true},
 	}
+	// Registry-overflow regression: maskLine builds one table entry per char
+	// and table.concat pushes every element onto the VM registry, so a single
+	// line past ~5KB blew up with "registry overflow" on every save.
+	cases = append(cases, testCase{name: "ng8 long line no overflow", path: "foo.component.ts",
+		content: "import { Component } from '@angular/core';\n@Component({ selector: 'app-foo', template: `` })\nexport class FooComponent { s = \"" + strings.Repeat("x", 9000) + "\"; }\n",
+		want: nil, wantCall: true})
 
 	failures := 0
 	for _, tc := range cases {

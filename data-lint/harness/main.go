@@ -92,6 +92,10 @@ func main() {
 		{name: "yaml unterminated quote", path: "a.yml", content: "a: \"hi\n", want: []string{"1:error:unterminated quoted string"}},
 		{name: "yaml block scalar ok", path: "a.yml", content: "a: |\n  hello\n  world\n", want: nil, wantCall: true},
 		{name: "yaml inconsistent indent", path: "a.yml", content: "a:\n    b: 1\n  c: 2\n", want: []string{"3:error:inconsistent indentation"}},
+		// Registry-overflow regression: stripSpans builds one table entry per
+		// char and table.concat pushes every element onto the VM registry, so a
+		// single line past ~5KB blew up with "registry overflow" on every save.
+		{name: "yaml long line no overflow", path: "a.yml", content: "data: " + strings.Repeat("x", 9000) + "\n", want: nil, wantCall: true},
 		// XML
 		{name: "xml valid", path: "a.xml", content: "<a><b/></a>\n", want: nil, wantCall: true},
 		{name: "xml mismatch", path: "a.xml", content: "<a></b>\n", want: []string{"1:error:'</b>' does not match '<a>'"}},

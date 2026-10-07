@@ -17,6 +17,34 @@ local function set(words)
   return t
 end
 
+-- joinChunks concatenates a chunk array in bounded batches. table.concat in
+-- gopher-lua PUSHES every element onto the VM registry, so masking a file
+-- char-by-char (e.g. a 7KB import target) overflows it with "registry
+-- overflow". Batching keeps each registry use well under the limit
+-- regardless of input size. Same helper as python-lint.
+local function joinChunks(chunks, sep)
+  local cur = chunks
+  while #cur > 400 do
+    local parts = {}
+    local n = #cur
+    local i = 1
+    while i <= n do
+      local j = i + 399
+      if j > n then j = n end
+      local batch = {}
+      local b = 1
+      for k = i, j do
+        batch[b] = cur[k]
+        b = b + 1
+      end
+      parts[#parts + 1] = table.concat(batch, sep)
+      i = j + 1
+    end
+    cur = parts -- every level joins with sep, including batch boundaries
+  end
+  return table.concat(cur, sep)
+end
+
 local function langTable(lang)
   if lang == "go" then
     return {
@@ -1042,7 +1070,7 @@ local function analyzeImports(toks, cfg, path)
         i = i + 1
       end
     end
-    return table.concat(out)
+    return joinChunks(out)
   end
 
   local jsExts = { ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs" }
@@ -1098,7 +1126,7 @@ local function analyzeImports(toks, cfg, path)
         i = i + 1
       end
     end
-    return table.concat(out)
+    return joinChunks(out)
   end
 
   -- emitExportList records one `export { ... }` item list: plain names go
@@ -1308,7 +1336,7 @@ local function analyzeImports(toks, cfg, path)
   local function resolvePyModule(dotted, level)
     local ups = {}
     for _ = 2, level do ups[#ups + 1] = ".." end
-    local prefix = table.concat(ups, "/")
+    local prefix = joinChunks(ups, "/")
     local modpath = dotted:gsub("%.", "/")
     local base = (prefix == "" and modpath) or (prefix .. "/" .. modpath)
     for _, c in ipairs({ base .. ".py", base .. "/__init__.py" }) do
