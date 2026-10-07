@@ -20,15 +20,16 @@ local function fileSummary(git)
     return "clean working tree"
   end
 
+  -- Compact states: first letters only (S/U), with git's ? for untracked.
   local parts = {}
   if staged > 0 then
-    table.insert(parts, staged .. " staged")
+    table.insert(parts, staged .. " S")
   end
   if unstaged > 0 then
-    table.insert(parts, unstaged .. " unstaged")
+    table.insert(parts, unstaged .. " U")
   end
   if untracked > 0 then
-    table.insert(parts, untracked .. " untracked")
+    table.insert(parts, untracked .. " ?")
   end
 
   -- Tiny bounded join (at most 3 items): no registry pressure.

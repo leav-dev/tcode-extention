@@ -139,14 +139,14 @@ func main() {
 			git: gitMock{hasGit: true, branch: str("feat"),
 				staged: []string{"a.go"}, unstaged: []string{"b.go", "c.go"},
 				added: 15, deleted: 8},
-			want: "Git Changes [feat]: 3 files (1 staged, 2 unstaged), +15 -8 lines",
+			want: "Git Changes [feat]: 3 files (1 S, 2 U), +15 -8 lines",
 		},
 		{
 			name:   "branch with untracked only",
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str("main"),
 				untracked: []string{"new.txt"}},
-			want: "Git Changes [main]: 1 files (1 untracked), +0 -0 lines",
+			want: "Git Changes [main]: 1 files (1 ?), +0 -0 lines",
 		},
 		{
 			name:   "detached HEAD shows short SHA",
@@ -165,7 +165,7 @@ func main() {
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str(""),
 				unstaged: []string{"b.go"}, added: 2, deleted: 1},
-			want: "Git Changes: 1 files (1 unstaged), +2 -1 lines",
+			want: "Git Changes: 1 files (1 U), +2 -1 lines",
 		},
 		{
 			name:   "no active buffer",
@@ -186,7 +186,7 @@ func main() {
 				commitHash: str("a1b2c3d"), commitSubject: str("Fix login"),
 				commitAuthor: str("Ada"), commitDate: str("2026-10-01"),
 				unstaged: []string{"b.go"}, added: 3, deleted: 1},
-			want: "Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | 1 files (1 unstaged), +3 -1 lines",
+			want: "Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | 1 files (1 U), +3 -1 lines",
 		},
 		{
 			name:   "status with commit clean tree",
