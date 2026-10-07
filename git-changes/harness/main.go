@@ -1,4 +1,4 @@
-// Verification harness for git-changes/main.lua: status().
+// Verification harness for git-changes/main.lua: status() and info().
 package main
 
 import (
@@ -15,14 +15,21 @@ type gitMock struct {
 	untracked []string
 	added     int
 	deleted   int
-	branch    *string // nil = field absent (older editor without branch)
+	// Pointer fields: nil = absent (older editor without the field).
+	branch        *string
+	commitHash    *string
+	commitSubject *string
+	commitAuthor  *string
+	commitDate    *string
 }
 
 type testCase struct {
 	name    string
-	hasBuf  bool // false = tcode.buffer() returns nil (no active buffer)
+	fn      string // Lua entry point; "" defaults to "status"
+	section string // section id to capture; "" defaults to "tcode.gitchanges"
+	hasBuf  bool   // false = tcode.buffer() returns nil (no active buffer)
 	git     gitMock
-	want    string // expected tcode.gitchanges section text
+	want    string // expected section text
 	wantSet bool   // false = setSection must not be called
 }
 
@@ -63,9 +70,16 @@ func run(tc testCase) (actual string, called bool, err error) {
 		t.RawSetString("untracked", strs(tc.git.untracked))
 		t.RawSetString("added", lua.LNumber(tc.git.added))
 		t.RawSetString("deleted", lua.LNumber(tc.git.deleted))
-		if tc.git.branch != nil {
-			t.RawSetString("branch", lua.LString(*tc.git.branch))
+		opt := func(key string, v *string) {
+			if v != nil {
+				t.RawSetString(key, lua.LString(*v))
+			}
 		}
+		opt("branch", tc.git.branch)
+		opt("commit_hash", tc.git.commitHash)
+		opt("commit_subject", tc.git.commitSubject)
+		opt("commit_author", tc.git.commitAuthor)
+		opt("commit_date", tc.git.commitDate)
 		L.Push(t)
 		return 1
 	}))
@@ -75,10 +89,14 @@ func run(tc testCase) (actual string, called bool, err error) {
 
 	statusBar := L.NewTable()
 	L.SetField(tcode, "statusBar", statusBar)
+	wantSection := tc.section
+	if wantSection == "" {
+		wantSection = "tcode.gitchanges"
+	}
 	L.SetField(statusBar, "setSection", L.NewFunction(func(L *lua.LState) int {
 		id := L.CheckString(1)
 		text := L.CheckString(2)
-		if id == "tcode.gitchanges" {
+		if id == wantSection {
 			called = true
 			actual = text
 		}
@@ -93,8 +111,12 @@ func run(tc testCase) (actual string, called bool, err error) {
 	if err := L.DoFile("../main.lua"); err != nil {
 		return "", false, err
 	}
+	fn := tc.fn
+	if fn == "" {
+		fn = "status"
+	}
 	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("status"),
+		Fn:      L.GetGlobal(fn),
 		NRet:    0,
 		Protect: true,
 	}, lua.LNil, lua.LNil); err != nil {
@@ -156,6 +178,38 @@ func main() {
 			hasBuf: true,
 			git:    gitMock{hasGit: false},
 			want:   "Git Changes: not a git repository",
+		},
+		{
+			name:   "status with commit",
+			hasBuf: true,
+			git: gitMock{hasGit: true, branch: str("main"),
+				commitHash: str("a1b2c3d"), commitSubject: str("Fix login"),
+				commitAuthor: str("Ada"), commitDate: str("2026-10-01"),
+				unstaged: []string{"b.go"}, added: 3, deleted: 1},
+			want: "Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | 1 files (1 unstaged), +3 -1 lines",
+		},
+		{
+			name:   "status with commit clean tree",
+			hasBuf: true,
+			git: gitMock{hasGit: true, branch: str("main"),
+				commitHash: str("a1b2c3d"), commitSubject: str("Fix login"),
+				commitAuthor: str("Ada"), commitDate: str("2026-10-01")},
+			want: "Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | clean working tree",
+		},
+		{
+			name:   "status subject without author date",
+			hasBuf: true,
+			git: gitMock{hasGit: true, branch: str("main"),
+				commitHash: str("a1b2c3d"), commitSubject: str("Fix login")},
+			want: "Git Changes [main a1b2c3d]: Fix login | clean working tree",
+		},
+		{
+			name:   "status empty hash keeps branch only",
+			hasBuf: true,
+			git: gitMock{hasGit: true, branch: str("main"),
+				commitHash: str(""), commitSubject: str("Fix login"),
+				commitAuthor: str("Ada"), commitDate: str("2026-10-01")},
+			want: "Git Changes [main]: Fix login (Ada, 2026-10-01) | clean working tree",
 		},
 	}
 

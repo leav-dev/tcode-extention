@@ -7,6 +7,37 @@
 --
 -- Convention: every message sent to the user is English.
 
+-- fileSummary condenses the working-tree state into one line: either
+-- "clean working tree" or "N files (...), +a -b lines". Shared by
+-- status() and info() so both always agree.
+local function fileSummary(git)
+  local staged = #git.staged
+  local unstaged = #git.unstaged
+  local untracked = #git.untracked
+  local total_files = staged + unstaged + untracked
+
+  if total_files == 0 then
+    return "clean working tree"
+  end
+
+  local parts = {}
+  if staged > 0 then
+    table.insert(parts, staged .. " staged")
+  end
+  if unstaged > 0 then
+    table.insert(parts, unstaged .. " unstaged")
+  end
+  if untracked > 0 then
+    table.insert(parts, untracked .. " untracked")
+  end
+
+  -- Tiny bounded join (at most 3 items): no registry pressure.
+  local file_summary = table.concat(parts, ", ")
+  local line_summary = "+" .. git.added .. " -" .. git.deleted
+
+  return total_files .. " files (" .. file_summary .. "), " .. line_summary .. " lines"
+end
+
 -- status muestra un resumen de cambios de git en la barra de estado, en su
 -- propia sección (tcode.statusBar.setSection) para no pisar a las demás
 -- extensiones ni a los mensajes del editor.
@@ -24,39 +55,38 @@ function status()
     return
   end
 
-  local staged = #git.staged
-  local unstaged = #git.unstaged
-  local untracked = #git.untracked
-  local total_files = staged + unstaged + untracked
-
-  -- Branch is informative: older editors do not expose it (nil), and the
-  -- editor reports "" when it cannot be determined. Both degrade to the
-  -- branchless format.
+  -- Branch + commit encadenados al scope. Informative: faltan en editores
+  -- viejos (nil) o cuando no se pudieron determinar (""): cada segmento
+  -- ausente se omite sin romper.
   local scope = "Git Changes"
+  local where = {}
   if git.branch ~= nil and git.branch ~= "" then
-    scope = scope .. " [" .. git.branch .. "]"
+    where[#where + 1] = git.branch
+  end
+  if git.commit_hash ~= nil and git.commit_hash ~= "" then
+    where[#where + 1] = git.commit_hash
+  end
+  if #where > 0 then
+    scope = scope .. " [" .. table.concat(where, " ") .. "]"
   end
 
-  if total_files == 0 then
-    tcode.statusBar.setSection("tcode.gitchanges", scope .. ": clean working tree")
-    return
+  local detail = ""
+  if git.commit_subject ~= nil and git.commit_subject ~= "" then
+    detail = git.commit_subject
+    local by = {}
+    if git.commit_author ~= nil and git.commit_author ~= "" then
+      by[#by + 1] = git.commit_author
+    end
+    if git.commit_date ~= nil and git.commit_date ~= "" then
+      by[#by + 1] = git.commit_date
+    end
+    if #by > 0 then
+      detail = detail .. " (" .. table.concat(by, ", ") .. ")"
+    end
+    detail = detail .. " | "
   end
 
-  local parts = {}
-  if staged > 0 then
-    table.insert(parts, staged .. " staged")
-  end
-  if unstaged > 0 then
-    table.insert(parts, unstaged .. " unstaged")
-  end
-  if untracked > 0 then
-    table.insert(parts, untracked .. " untracked")
-  end
-
-  local file_summary = table.concat(parts, ", ")
-  local line_summary = "+" .. git.added .. " -" .. git.deleted
-
-  tcode.statusBar.setSection("tcode.gitchanges", scope .. ": " .. total_files .. " files (" .. file_summary .. "), " .. line_summary .. " lines")
+  tcode.statusBar.setSection("tcode.gitchanges", scope .. ": " .. detail .. fileSummary(git))
 end
 
 -- mark marca las líneas con cambios en el gutter usando diagnostics.
