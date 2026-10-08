@@ -1,0 +1,367 @@
+{
+  ".tcode/session.json": {
+    "mtime": 1791470079.677606,
+    "ast_hash": "f499f20f932a24d5e2204a3f67f4cead",
+    "semantic_hash": ""
+  },
+  "angular21-lint/extension.json": {
+    "mtime": 1791408848.4314978,
+    "ast_hash": "ad5d46a3b6bf862f18968c6659f1933d",
+    "semantic_hash": ""
+  },
+  "angular21-lint/harness/go.mod": {
+    "mtime": 1791304412.7361927,
+    "ast_hash": "dd9ffc6047d9819ed415eb0b29949fa9",
+    "semantic_hash": ""
+  },
+  "angular21-lint/harness/main.go": {
+    "mtime": 1791408870.0791728,
+    "ast_hash": "b84487e13d1f09a4fe698cdc62ec903d",
+    "semantic_hash": ""
+  },
+  "angular21-lint/main.lua": {
+    "mtime": 1791408879.6428223,
+    "ast_hash": "0d3d05258c8f78611dc3c2a6cea5dd19",
+    "semantic_hash": ""
+  },
+  "angular8-lint/extension.json": {
+    "mtime": 1791408848.4314978,
+    "ast_hash": "d3f643eb0c0339e93c3e9ac0cc3ed740",
+    "semantic_hash": ""
+  },
+  "angular8-lint/harness/go.mod": {
+    "mtime": 1791304412.73743,
+    "ast_hash": "1a3b90f3eea8a2f20c5b2ff4b0a894c9",
+    "semantic_hash": ""
+  },
+  "angular8-lint/harness/main.go": {
+    "mtime": 1791408862.4879363,
+    "ast_hash": "9d657133b605da28cef405de3f3f0451",
+    "semantic_hash": ""
+  },
+  "angular8-lint/main.lua": {
+    "mtime": 1791408875.9733565,
+    "ast_hash": "25f6e4be5c048b24eb09a26acb21aa88",
+    "semantic_hash": ""
+  },
+  "emacs-lite/extension.json": {
+    "mtime": 1791208923.922348,
+    "ast_hash": "d081e61ec9f1fceac2c4893207052f67",
+    "semantic_hash": ""
+  },
+  "error-detector/extension.json": {
+    "mtime": 1791311575.8900857,
+    "ast_hash": "0baafbcd82720980e446fd77b7e1df83",
+    "semantic_hash": ""
+  },
+  "error-detector/harness/go.mod": {
+    "mtime": 1791304412.737755,
+    "ast_hash": "8ea35546d419a3b1ac1185ff37dfb579",
+    "semantic_hash": ""
+  },
+  "error-detector/harness/main.go": {
+    "mtime": 1791304412.7387516,
+    "ast_hash": "15e82ceabec8ed0e092b37916c420728",
+    "semantic_hash": ""
+  },
+  "error-detector/main.lua": {
+    "mtime": 1791304423.8119004,
+    "ast_hash": "7137bc1d0fdc0963150b627bbef7c0cd",
+    "semantic_hash": ""
+  },
+  "git-changes/extension.json": {
+    "mtime": 1791470324.8912516,
+    "ast_hash": "9a72c34af7a31e7d5cfe659469a2e14c",
+    "semantic_hash": ""
+  },
+  "git-changes/main.lua": {
+    "mtime": 1791470303.699528,
+    "ast_hash": "895d04f5e3924e86d942a6d4ff354feb",
+    "semantic_hash": ""
+  },
+  "python-lint/extension.json": {
+    "mtime": 1791304412.7410684,
+    "ast_hash": "4826a756dfb213a3af7d5313a9b8984b",
+    "semantic_hash": ""
+  },
+  "python-lint/harness/go.mod": {
+    "mtime": 1791236993.9794536,
+    "ast_hash": "a7d85d3b5f16919c406f2449705081be",
+    "semantic_hash": ""
+  },
+  "python-lint/harness/main.go": {
+    "mtime": 1791237705.6612687,
+    "ast_hash": "7d8ff2d95f16be3fb076c212dbe4fc3e",
+    "semantic_hash": ""
+  },
+  "python-lint/harness/realfile/main.go": {
+    "mtime": 1791237115.539178,
+    "ast_hash": "5cde9d918c04d7765f565894b8e53afb",
+    "semantic_hash": ""
+  },
+  "python-lint/main.lua": {
+    "mtime": 1791304412.7414863,
+    "ast_hash": "53df0daecf821132f6dd25058eb6dcdd",
+    "semantic_hash": ""
+  },
+  "undefined-vars/extension.json": {
+    "mtime": 1791323221.6422572,
+    "ast_hash": "0c6a57906cb0dc103a77fa6f8bb9d8d6",
+    "semantic_hash": ""
+  },
+  "undefined-vars/main.lua": {
+    "mtime": 1791323197.8555527,
+    "ast_hash": "721c7cd0cef6eb6f74c14730da5b7100",
+    "semantic_hash": ""
+  },
+  "unused-imports/extension.json": {
+    "mtime": 1791408790.9006982,
+    "ast_hash": "31b8925b3c76bc1f645763994ba25347",
+    "semantic_hash": ""
+  },
+  "unused-imports/main.lua": {
+    "mtime": 1791408820.0036247,
+    "ast_hash": "529389206a2ec65ad6f0f1389dc9d338",
+    "semantic_hash": ""
+  },
+  "vim-lite/extension.json": {
+    "mtime": 1791208923.925367,
+    "ast_hash": "1d227b2e2cfc045319590e298bdd1111",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1791470330.7321513,
+    "ast_hash": "ecef27ed01ac3f6fbe87aa4ea66416eb",
+    "semantic_hash": ""
+  },
+  "angular21-lint/README.md": {
+    "mtime": 1791304412.7358444,
+    "ast_hash": "5a3139fd4b03bd8ae2189d3239a7cd81",
+    "semantic_hash": ""
+  },
+  "angular8-lint/README.md": {
+    "mtime": 1791304412.7366529,
+    "ast_hash": "1ccfe8ea330a17fa046b11a22317d3e2",
+    "semantic_hash": ""
+  },
+  "emacs-lite/README.md": {
+    "mtime": 1791208923.922348,
+    "ast_hash": "b6905fc658a20d307933bd5f97e2976b",
+    "semantic_hash": ""
+  },
+  "error-detector/README.md": {
+    "mtime": 1791304412.737755,
+    "ast_hash": "a7f9e9d8f02923b11f59810d6722aa58",
+    "semantic_hash": ""
+  },
+  "git-changes/README.md": {
+    "mtime": 1791470328.5861893,
+    "ast_hash": "9934da59886af1e636a1324c3d87f63f",
+    "semantic_hash": ""
+  },
+  "odd/tasks/angular-lint.md": {
+    "mtime": 1791304412.739499,
+    "ast_hash": "18a98e3662afb2caf5267371ca23b7fc",
+    "semantic_hash": ""
+  },
+  "odd/tasks/declarative-batch-1.md": {
+    "mtime": 1791208923.9234767,
+    "ast_hash": "f09160d36c7ae30405ade60542e38e5d",
+    "semantic_hash": ""
+  },
+  "odd/tasks/diagnostics-inline.md": {
+    "mtime": 1791208923.9236689,
+    "ast_hash": "d011fc74e713d6d512b2a2ef24aeaebc",
+    "semantic_hash": ""
+  },
+  "odd/tasks/error-detector.md": {
+    "mtime": 1791208923.9236689,
+    "ast_hash": "b8b8b6382d22e3026424c55c59c1d78f",
+    "semantic_hash": ""
+  },
+  "odd/tasks/git-changes.md": {
+    "mtime": 1791209424.18251,
+    "ast_hash": "56694bb82a619bbd30a89a3d57b61e70",
+    "semantic_hash": ""
+  },
+  "odd/tasks/html-tag-detection.md": {
+    "mtime": 1791304412.739499,
+    "ast_hash": "e65dfe712b9d3d55d5f03cfc68f0400f",
+    "semantic_hash": ""
+  },
+  "odd/tasks/linter-scope.md": {
+    "mtime": 1791222810.2194357,
+    "ast_hash": "7d769143f2c083658f6ebc4dec214a8c",
+    "semantic_hash": ""
+  },
+  "odd/tasks/python-lint.md": {
+    "mtime": 1791304412.7405121,
+    "ast_hash": "82bffeb1301c69d0f1bf9161b858e576",
+    "semantic_hash": ""
+  },
+  "python-lint/README.md": {
+    "mtime": 1791304412.7408552,
+    "ast_hash": "117177cc2aac66645ad9692684d9e960",
+    "semantic_hash": ""
+  },
+  "undefined-vars/README.md": {
+    "mtime": 1791307221.6086996,
+    "ast_hash": "8558dc56356e35736e8bab9413a9be96",
+    "semantic_hash": ""
+  },
+  "unused-imports/README.md": {
+    "mtime": 1791306486.0876827,
+    "ast_hash": "fec9c0a67289a2838bb2a2cb5d8dbc05",
+    "semantic_hash": ""
+  },
+  "vim-lite/README.md": {
+    "mtime": 1791208923.925367,
+    "ast_hash": "0a2dc43a66d9816320001fe8df94e913",
+    "semantic_hash": ""
+  },
+  "odd/tasks/git-changes-status-section.md": {
+    "mtime": 1791304419.6095734,
+    "ast_hash": "82aab11891cb1cc2adf178f1da346e1b",
+    "semantic_hash": ""
+  },
+  "undefined-vars/harness/go.mod": {
+    "mtime": 1791305030.2171614,
+    "ast_hash": "7959cbe68587f91da0b4cd747e119065",
+    "semantic_hash": ""
+  },
+  "undefined-vars/harness/main.go": {
+    "mtime": 1791323200.3075223,
+    "ast_hash": "9f9555bfedc85f0c9d27cda78373a437",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/go.mod": {
+    "mtime": 1791306475.5511663,
+    "ast_hash": "b7538546a9a9ea2e8af6b87a2e2878a0",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/main.go": {
+    "mtime": 1791408809.6232848,
+    "ast_hash": "87202625b494e55bc7eeb56960661bc9",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/base.ts": {
+    "mtime": 1791307207.0526893,
+    "ast_hash": "2a2465c187d2ebdbe66b0cb32be6e340",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/helpers.py": {
+    "mtime": 1791306475.5375135,
+    "ast_hash": "6f5df5a497b1bf21401732d34187689c",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/legacy.ts": {
+    "mtime": 1791306475.537402,
+    "ast_hash": "3564a9e493b93a9649f56934e5e8d433",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/pkg/__init__.py": {
+    "mtime": 1791306475.537181,
+    "ast_hash": "acd1d69642537faa053d776dfd764ace",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/reexp.ts": {
+    "mtime": 1791306475.5374577,
+    "ast_hash": "d736acae2402a7ecda850ce04cae0000",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/types.ts": {
+    "mtime": 1791306475.5373461,
+    "ast_hash": "92a67dbbc033a0df71e6d2320203ec1d",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/util.ts": {
+    "mtime": 1791306475.5372865,
+    "ast_hash": "2da5f63797170fe3bc5a18cfbd4540df",
+    "semantic_hash": ""
+  },
+  "data-lint/extension.json": {
+    "mtime": 1791408889.24677,
+    "ast_hash": "f0816065783a46dd91a2e0d9ddc2e070",
+    "semantic_hash": ""
+  },
+  "data-lint/harness/go.mod": {
+    "mtime": 1791318695.7372427,
+    "ast_hash": "2fc45a32a66684d856f7ca22876937ef",
+    "semantic_hash": ""
+  },
+  "data-lint/harness/main.go": {
+    "mtime": 1791408986.7527943,
+    "ast_hash": "56211c92fd934562f3fb4b3d35b1fa25",
+    "semantic_hash": ""
+  },
+  "data-lint/main.lua": {
+    "mtime": 1791408990.9789248,
+    "ast_hash": "9e3f7bbccdd5a4548d4713a83be840fb",
+    "semantic_hash": ""
+  },
+  "data-lint/README.md": {
+    "mtime": 1791318494.249293,
+    "ast_hash": "09eb96d86366d3d9ee8c23e7ccf4fe1e",
+    "semantic_hash": ""
+  },
+  "odd/tasks/data-lint.md": {
+    "mtime": 1791318916.353233,
+    "ast_hash": "125cf3694c6edff85403532f6dd5f6bd",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1791322988.5371466,
+    "ast_hash": "56d53e89013bc7a34f2ebb020a9d5e49",
+    "semantic_hash": ""
+  },
+  "odd/tasks/undefined-vars-member-chain.md": {
+    "mtime": 1791322723.6778424,
+    "ast_hash": "25565ad8750f0af16ac0e2de578f4e13",
+    "semantic_hash": ""
+  },
+  "odd/tasks/undefined-vars-multiline-imports.md": {
+    "mtime": 1791322723.6778424,
+    "ast_hash": "8acc68a8af9d67aa1b9c736b5c80c041",
+    "semantic_hash": ""
+  },
+  "git-changes/harness/go.mod": {
+    "mtime": 1791408185.4169557,
+    "ast_hash": "e5f5e67f1efdfa05fa9a71c2b8ee581c",
+    "semantic_hash": ""
+  },
+  "git-changes/harness/main.go": {
+    "mtime": 1791470318.4503505,
+    "ast_hash": "f5d6f308ff765cf90dd53386a08c9140",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/big.ts": {
+    "mtime": 1791408796.220865,
+    "ast_hash": "4d6d9f87d859bc9f04f7a7f072bbfb28",
+    "semantic_hash": ""
+  },
+  "unused-imports/harness/testdata/proj/longline.ts": {
+    "mtime": 1791408803.3660889,
+    "ast_hash": "5cabfab86a4046fecc17e4dfecc68eb8",
+    "semantic_hash": ""
+  },
+  "odd/tasks/concat-overflow-fix.md": {
+    "mtime": 1791408773.6311562,
+    "ast_hash": "e45bde5f9f3b8f67849ac6d1a4ce7b0a",
+    "semantic_hash": ""
+  },
+  "odd/tasks/git-changes-branch.md": {
+    "mtime": 1791408137.9883118,
+    "ast_hash": "d8afdaecfc38f4a000cfdefd8dcc80d1",
+    "semantic_hash": ""
+  },
+  "odd/tasks/git-changes-info.md": {
+    "mtime": 1791409553.9161232,
+    "ast_hash": "803cb9d79e8b177a30ea53fb4b292200",
+    "semantic_hash": ""
+  },
+  "odd/tasks/undefined-vars-comprehension-for.md": {
+    "mtime": 1791323262.5397494,
+    "ast_hash": "950d1a00b4137e38af1ec588528dc78a",
+    "semantic_hash": ""
+  }
+}
