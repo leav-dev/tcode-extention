@@ -424,7 +424,18 @@ local function analyzeScope(toks, cfg)
 
   local function handleGo(tok, j)
     local w = tok.w
-    if w == "func" then
+    if w == "struct" or w == "interface" then
+      -- Struct/interface body: field and method names are declarations,
+      -- never usages. Covers `type S struct {...}`, `var V struct {...}`,
+      -- `type I interface {...}`, aliases and anonymous literal type parts
+      -- (`struct{...}{...}`: only the type group is skipped, the value
+      -- group still runs so real usages inside keep flagging).
+      if isSym(j + 1, "{") then
+        local _, endj = readGroup(toks, j + 1, "{", "}")
+        return endj + 1
+      end
+      return j + 1
+    elseif w == "func" then
       local k = j + 1
       local ids, endj
       local params = {}
@@ -454,7 +465,14 @@ local function analyzeScope(toks, cfg)
           for _, rn in ipairs(rids) do params[#params + 1] = rn end
           k = endj + 1
         elseif isId(k) then
+          -- Single result type: skip it; a struct/interface result body
+          -- holds declarations, not usages (`func f() struct { A int }`).
+          local rw = toks[k].w
           k = k + 1
+          if (rw == "struct" or rw == "interface") and isSym(k, "{") then
+            local _, rendj = readGroup(toks, k, "{", "}")
+            k = rendj + 1
+          end
         end
       end
       pendingParams = params
@@ -518,10 +536,20 @@ local function analyzeScope(toks, cfg)
         for _, v in ipairs(ids) do define(v) end
         return endj + 1
       end
-      while isId(k) do
+      while isId(k) and not cfg.keywords[toks[k].w] do
+        -- Keywords stop the name list: `type S struct {...}` leaves
+        -- `struct` unconsumed so the struct/interface skip above runs.
+        -- (Keywords can never be declared names in Go.)
         define(toks[k].w)
         k = k + 1
         if isSym(k, ",") then k = k + 1 end
+      end
+      if w == "type" and isSym(k, "[") then
+        -- Generic type params: `type Box[T any] struct {...}`. Constraints
+        -- are over-collected as names (harmless: only suppresses warnings).
+        local tids, tendj = readGroup(toks, k, "[", "]")
+        for _, t in ipairs(tids) do define(t) end
+        k = tendj + 1
       end
       return k
     end

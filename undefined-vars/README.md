@@ -29,7 +29,10 @@ analyzed by this extension (no scope rules for them in v1).
 ## Notes and limits (v1)
 
 - Definitions: go `var/const/type` (single + block), `:=`, funcs/methods with
-  receiver, params + named returns, imports (aliased; dot imports disable
+  receiver, params + named returns, generic type params (`type Box[T any]`),
+  struct/interface bodies skipped (field and method names are declarations,
+  including anonymous `struct{...}` types and struct result types),
+  imports (aliased; dot imports disable
   undefined checks); js/ts `let/const/var` (with simple destructuring),
   functions/classes/arrows, import bindings; py any assignment, `def`/`class`,
   `import`/`from`, lambda/for/with-as params.
