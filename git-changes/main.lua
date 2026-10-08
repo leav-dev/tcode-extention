@@ -81,11 +81,9 @@ end
 local visible = false
 
 -- mark shows changed lines in the gutter using diagnostics.
--- Added lines use severity "info" (+ in the gutter).
--- Deleted lines use severity "warning" (- in the gutter).
--- Modified lines use severity "info" (~ in the gutter).
--- Every message includes the 1-indexed line number in English:
--- "+ line 12 added", "~ line 7 modified", "- line 3 deleted".
+-- Added lines use severity "info", deleted lines use severity
+-- "warning", modified lines use severity "info". Messages are empty:
+-- only the gutter indicator renders, no message text.
 function mark()
   local path = tcode.buffer()
   if not path then
@@ -149,27 +147,17 @@ function mark()
     end
   end
 
-  -- Convert to diagnostics
+  -- Convert to diagnostics (message empty: indicator only)
   local diags = {}
   for _, d in ipairs(coalesced) do
     local severity = "info"
-    local marker = "+"
-    local kind = d.type
     if d.type == "deleted" then
       severity = "warning"
-      marker = "-"
-    elseif d.type == "modified" then
-      severity = "info"
-      marker = "~"
-    else
-      severity = "info"
-      marker = "+"
-      kind = "added"
     end
 
     table.insert(diags, {
       line = d.line,
-      message = marker .. " line " .. d.line .. " " .. kind,
+      message = "",
       severity = severity
     })
   end

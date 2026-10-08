@@ -388,22 +388,22 @@ func main() {
 
 	diagCases := []diagTestCase{
 		{
-			name:      "mark added has line number",
+			name:      "mark added indicator only",
 			hasBuf:    true,
 			unstaged:  []diffEntry{{Line: 12, Type: "added"}},
-			wantDiags: []wantDiag{{Line: 12, Message: "+ line 12 added", Severity: "info"}},
+			wantDiags: []wantDiag{{Line: 12, Message: "", Severity: "info"}},
 		},
 		{
-			name:      "mark modified has line number",
+			name:      "mark modified indicator only",
 			hasBuf:    true,
 			unstaged:  []diffEntry{{Line: 7, Type: "modified"}},
-			wantDiags: []wantDiag{{Line: 7, Message: "~ line 7 modified", Severity: "info"}},
+			wantDiags: []wantDiag{{Line: 7, Message: "", Severity: "info"}},
 		},
 		{
-			name:      "mark deleted has line number",
+			name:      "mark deleted indicator only",
 			hasBuf:    true,
 			unstaged:  []diffEntry{{Line: 3, Type: "deleted"}},
-			wantDiags: []wantDiag{{Line: 3, Message: "- line 3 deleted", Severity: "warning"}},
+			wantDiags: []wantDiag{{Line: 3, Message: "", Severity: "warning"}},
 		},
 		{
 			name:     "mark merges staged and unstaged",
@@ -411,8 +411,8 @@ func main() {
 			unstaged: []diffEntry{{Line: 2, Type: "added"}},
 			staged:   []diffEntry{{Line: 5, Type: "deleted"}},
 			wantDiags: []wantDiag{
-				{Line: 2, Message: "+ line 2 added", Severity: "info"},
-				{Line: 5, Message: "- line 5 deleted", Severity: "warning"},
+				{Line: 2, Message: "", Severity: "info"},
+				{Line: 5, Message: "", Severity: "warning"},
 			},
 		},
 		{
@@ -424,20 +424,20 @@ func main() {
 			name:      "mark deleted plus added coalesces to modified",
 			hasBuf:    true,
 			unstaged:  []diffEntry{{Line: 5, Type: "deleted"}, {Line: 5, Type: "added"}},
-			wantDiags: []wantDiag{{Line: 5, Message: "~ line 5 modified", Severity: "info"}},
+			wantDiags: []wantDiag{{Line: 5, Message: "", Severity: "info"}},
 		},
 		{
 			name:     "mark multi-entry replace coalesces to one modified",
 			hasBuf:   true,
 			unstaged: []diffEntry{{Line: 5, Type: "deleted"}, {Line: 5, Type: "deleted"}, {Line: 5, Type: "added"}, {Line: 5, Type: "added"}},
-			wantDiags: []wantDiag{{Line: 5, Message: "~ line 5 modified", Severity: "info"}},
+			wantDiags: []wantDiag{{Line: 5, Message: "", Severity: "info"}},
 		},
 		{
 			name:     "mark staged plus unstaged pair coalesces",
 			hasBuf:   true,
 			unstaged: []diffEntry{{Line: 8, Type: "deleted"}},
 			staged:   []diffEntry{{Line: 8, Type: "added"}},
-			wantDiags: []wantDiag{{Line: 8, Message: "~ line 8 modified", Severity: "info"}},
+			wantDiags: []wantDiag{{Line: 8, Message: "", Severity: "info"}},
 		},
 		{
 			name:     "mark same-line adds stay separate",
@@ -445,8 +445,8 @@ func main() {
 			unstaged: []diffEntry{{Line: 2, Type: "added"}},
 			staged:   []diffEntry{{Line: 2, Type: "added"}},
 			wantDiags: []wantDiag{
-				{Line: 2, Message: "+ line 2 added", Severity: "info"},
-				{Line: 2, Message: "+ line 2 added", Severity: "info"},
+				{Line: 2, Message: "", Severity: "info"},
+				{Line: 2, Message: "", Severity: "info"},
 			},
 		},
 		{
@@ -455,8 +455,8 @@ func main() {
 			unstaged: []diffEntry{{Line: 3, Type: "deleted"}},
 			staged:   []diffEntry{{Line: 3, Type: "deleted"}},
 			wantDiags: []wantDiag{
-				{Line: 3, Message: "- line 3 deleted", Severity: "warning"},
-				{Line: 3, Message: "- line 3 deleted", Severity: "warning"},
+				{Line: 3, Message: "", Severity: "warning"},
+				{Line: 3, Message: "", Severity: "warning"},
 			},
 		},
 		{
@@ -506,15 +506,15 @@ func main() {
 		}
 	}
 
-	// Toggle: first call shows numbered marks, second call clears.
+	// Toggle: first call shows marks, second call clears.
 	toggleDiff := diagTestCase{
 		hasBuf:   true,
 		unstaged: []diffEntry{{Line: 12, Type: "added"}, {Line: 7, Type: "modified"}, {Line: 3, Type: "deleted"}},
 	}
 	wantToggle := []wantDiag{
-		{Line: 12, Message: "+ line 12 added", Severity: "info"},
-		{Line: 7, Message: "~ line 7 modified", Severity: "info"},
-		{Line: 3, Message: "- line 3 deleted", Severity: "warning"},
+		{Line: 12, Message: "", Severity: "info"},
+		{Line: 7, Message: "", Severity: "info"},
+		{Line: 3, Message: "", Severity: "warning"},
 	}
 	first, second, err := runToggleTwice(toggleDiff)
 	if err != nil {
@@ -525,7 +525,7 @@ func main() {
 		} else if ok, detail := diagsEqual(first.setCalls[0], wantToggle); !ok {
 			report("toggle first call shows", "FAIL", detail)
 		} else {
-			report("toggle first call shows", "PASS", "numbered marks shown")
+			report("toggle first call shows", "PASS", "marks shown")
 		}
 		if second.clearCalls < 1 {
 			report("toggle second call clears", "FAIL", fmt.Sprintf("expected clear, got %+v", second))
@@ -572,7 +572,7 @@ func main() {
 			report("all runs status and mark", "FAIL", "status section not set")
 		} else if len(res.setCalls) != 1 {
 			report("all runs status and mark", "FAIL", fmt.Sprintf("expected 1 set, got %d", len(res.setCalls)))
-		} else if ok, detail := diagsEqual(res.setCalls[0], []wantDiag{{Line: 4, Message: "+ line 4 added", Severity: "info"}}); !ok {
+		} else if ok, detail := diagsEqual(res.setCalls[0], []wantDiag{{Line: 4, Message: "", Severity: "info"}}); !ok {
 			report("all runs status and mark", "FAIL", detail)
 		} else {
 			report("all runs status and mark", "PASS", fmt.Sprintf("status %q + marks", *actualP))
