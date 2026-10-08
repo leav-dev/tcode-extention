@@ -17,8 +17,8 @@ type testCase struct {
 	content   string
 	// Cursor setup. When hasCursor is false, tcode.cursor is left unset.
 	hasCursor bool
-	curLine   int
-	curCol    int
+	curLine   float64
+	curCol    float64
 	// Expectations. An empty wantInsert means "no insert expected".
 	wantInsert string
 	// Substrings that must appear in the joined messages ("" = no message expected).
@@ -185,6 +185,26 @@ func main() {
 			curCol:    3,
 			wantMessageSub: "3 candidates",
 			wantOrder:      "test, team, text",
+		},
+		{
+			name:      "fractional line",
+			hasBuffer: true,
+			path:      "a.txt",
+			content:   "foobar foobaz\nfoo",
+			hasCursor: true,
+			curLine:   1.5,
+			curCol:    4,
+			wantMessageSub: "invalid cursor position",
+		},
+		{
+			name:      "fractional col",
+			hasBuffer: true,
+			path:      "a.txt",
+			content:   "foobar foobaz\nfoo",
+			hasCursor: true,
+			curLine:   2,
+			curCol:    2.5,
+			wantMessageSub: "invalid cursor position",
 		},
 	}
 

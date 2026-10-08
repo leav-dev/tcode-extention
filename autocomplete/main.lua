@@ -12,13 +12,7 @@
 -- Convention: every message sent to the user is English.
 -- This script never touches the diagnostics API.
 --
--- Cycle state (top-level, documented): lastPrefix remembers the prefix of
--- the last completion and lastIdx the position inside the candidate list.
--- They are updated on every completion and are reserved for a future
--- cycle-through-candidates behavior; the current strategy only inserts
--- the longest common extension (or lists candidates when they diverge).
-local lastPrefix = nil
-local lastIdx = 0
+-- Completion is stateless: it inserts the longest common extension (or lists candidates when they diverge).
 
 function complete()
   local path, content = tcode.buffer()
@@ -39,6 +33,11 @@ function complete()
   curCol = tonumber(curCol)
   if not curLine or not curCol then
     tcode.message("Autocomplete: editor cursor API (tcode.cursor) is not available")
+    return
+  end
+
+  if curLine ~= math.floor(curLine) or curCol ~= math.floor(curCol) then
+    tcode.message("Autocomplete: invalid cursor position")
     return
   end
 
@@ -96,9 +95,6 @@ function complete()
       break
     end
   end
-
-  lastPrefix = prefix
-  lastIdx = 0
 
   local suffix = lcp:sub(#prefix + 1)
   if suffix ~= "" then

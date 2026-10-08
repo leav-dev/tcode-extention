@@ -26,8 +26,9 @@ sorts them by frequency (descending) then alphabetically, and:
 - when they diverge immediately (no shared extension), inserts nothing and
   shows up to 5 candidates with the total count instead.
 
-The script keeps top-level `lastPrefix`/`lastIdx` state (reserved for a
-future cycle-through-candidates behavior) and never touches diagnostics.
+The script is stateless (no completion cycle state) and validates that the
+cursor line/col are integers, rejecting fractional or NaN positions with
+`Autocomplete: invalid cursor position`. It never touches diagnostics.
 
 ## Limitation
 

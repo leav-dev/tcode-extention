@@ -36,3 +36,15 @@ Trigger: manual keybinding (no onDidChangeText by editor design, no popup API ye
 - Commit tagged `autocomplete-v1.0.0` — feat(autocomplete): buffer-word completion with alt+space (8 files).
 - Tag `autocomplete-v1.0.0` (lightweight, per-extension convention; matches manifest v1.0.0).
 - Harness: 9 cases, 0 failures.
+
+## v1.0.1 follow-up (R3-001/R3-002 disposition)
+- R3-001/R3-002 were informational, never-blocking follow-ups; applied in
+  v1.0.1 so they are not overlooked. No behavior change otherwise.
+- R3-001: validate the cursor line/col are integers after the tonumber
+  checks; fractional or NaN positions show
+  `Autocomplete: invalid cursor position` and no-op.
+- R3-002: removed the dead top-level `lastPrefix`/`lastIdx` state
+  (declaration plus all assignments); completion is stateless (longest
+  common extension or candidate list).
+- Manifest bumped to v1.0.1 (patch hardening); harness `curLine`/`curCol`
+  are now `float64` with fractional line/col regression cases.
