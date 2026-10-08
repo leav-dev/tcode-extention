@@ -5,9 +5,9 @@ Extensión para tcode que muestra información de cambios de git en la barra de 
 ## Características
 
 - **Status bar**: Shows branch plus file counts (S = staged, U = unstaged, ? = untracked) and added/deleted lines. Commit subject, author, date and hash are never shown.
-- **Gutter**: Marks added lines (`+` = info), deleted lines (`-` = warning) and modified lines (`~` = info), each with its 1-indexed line number
+- **Gutter**: Marks added lines (`+` = info), deleted lines (`-` = warning) and modified lines (`~` = info), each with its 1-indexed line number. A deleted+added pair on the same line coalesces into a single `~` modified mark (the editor diff never emits modified directly).
 - **Toggle**: Show gutter marks on first call, clear them on the second
-- **Auto-update**: Se actualiza automáticamente al guardar el buffer
+- **Auto-update**: Saving the buffer refreshes the status bar and re-shows gutter marks (marks are on by default)
 
 ## Instalación
 
@@ -27,7 +27,7 @@ tcode --install-extension <path>/tcode-extentions/git-changes
 
 ### Hooks
 
-- `onDidSaveBuffer`: Ejecuta `status` automáticamente al guardar
+- `onDidSaveBuffer`: Runs `all` (status bar plus gutter marks) automatically on save. Saving re-shows marks even after a manual toggle-off — by design, marks are on by default.
 
 ## Formato de mensajes
 

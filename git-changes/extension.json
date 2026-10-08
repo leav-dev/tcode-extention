@@ -1,7 +1,7 @@
 {
   "id": "tcode.gitchanges",
   "name": "Git Changes",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "activation": ["onStartup"],
   "contributes": {
     "commands": [
@@ -22,6 +22,12 @@
         "title": "Toggle changed lines in gutter",
         "script": "main.lua",
         "fn": "toggle"
+      },
+      {
+        "id": "tcode.gitchanges.all",
+        "title": "Show git summary and mark changed lines",
+        "script": "main.lua",
+        "fn": "all"
       }
     ],
     "keybindings": [
@@ -30,7 +36,7 @@
       { "key": "alt+shift+t", "command": "tcode.gitchanges.toggle" }
     ],
     "hooks": [
-      { "event": "onDidSaveBuffer", "command": "tcode.gitchanges.status" }
+      { "event": "onDidSaveBuffer", "command": "tcode.gitchanges.all" }
     ]
   }
 }

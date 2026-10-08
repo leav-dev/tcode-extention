@@ -112,9 +112,46 @@ function mark()
     return
   end
 
+  -- Coalesce deleted+added pairs on the same line into a single
+  -- modified entry: the editor diff emits only added/deleted, so an
+  -- edited line arrives as {line N, deleted} plus {line N, added}.
+  -- Lines with only one kind keep every entry unchanged.
+  local order = {}
+  local byLine = {}
+  for _, d in ipairs(all_diffs) do
+    local bucket = byLine[d.line]
+    if not bucket then
+      bucket = {}
+      byLine[d.line] = bucket
+      table.insert(order, d.line)
+    end
+    table.insert(bucket, d)
+  end
+
+  local coalesced = {}
+  for _, line in ipairs(order) do
+    local bucket = byLine[line]
+    local hasAdded = false
+    local hasDeleted = false
+    for _, d in ipairs(bucket) do
+      if d.type == "deleted" then
+        hasDeleted = true
+      elseif d.type == "added" then
+        hasAdded = true
+      end
+    end
+    if hasAdded and hasDeleted then
+      table.insert(coalesced, { line = line, type = "modified" })
+    else
+      for _, d in ipairs(bucket) do
+        table.insert(coalesced, d)
+      end
+    end
+  end
+
   -- Convert to diagnostics
   local diags = {}
-  for _, d in ipairs(all_diffs) do
+  for _, d in ipairs(coalesced) do
     local severity = "info"
     local marker = "+"
     local kind = d.type

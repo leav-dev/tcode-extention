@@ -421,6 +421,45 @@ func main() {
 			wantClear: true,
 		},
 		{
+			name:      "mark deleted plus added coalesces to modified",
+			hasBuf:    true,
+			unstaged:  []diffEntry{{Line: 5, Type: "deleted"}, {Line: 5, Type: "added"}},
+			wantDiags: []wantDiag{{Line: 5, Message: "~ line 5 modified", Severity: "info"}},
+		},
+		{
+			name:     "mark multi-entry replace coalesces to one modified",
+			hasBuf:   true,
+			unstaged: []diffEntry{{Line: 5, Type: "deleted"}, {Line: 5, Type: "deleted"}, {Line: 5, Type: "added"}, {Line: 5, Type: "added"}},
+			wantDiags: []wantDiag{{Line: 5, Message: "~ line 5 modified", Severity: "info"}},
+		},
+		{
+			name:     "mark staged plus unstaged pair coalesces",
+			hasBuf:   true,
+			unstaged: []diffEntry{{Line: 8, Type: "deleted"}},
+			staged:   []diffEntry{{Line: 8, Type: "added"}},
+			wantDiags: []wantDiag{{Line: 8, Message: "~ line 8 modified", Severity: "info"}},
+		},
+		{
+			name:     "mark same-line adds stay separate",
+			hasBuf:   true,
+			unstaged: []diffEntry{{Line: 2, Type: "added"}},
+			staged:   []diffEntry{{Line: 2, Type: "added"}},
+			wantDiags: []wantDiag{
+				{Line: 2, Message: "+ line 2 added", Severity: "info"},
+				{Line: 2, Message: "+ line 2 added", Severity: "info"},
+			},
+		},
+		{
+			name:     "mark same-line deletes stay separate",
+			hasBuf:   true,
+			unstaged: []diffEntry{{Line: 3, Type: "deleted"}},
+			staged:   []diffEntry{{Line: 3, Type: "deleted"}},
+			wantDiags: []wantDiag{
+				{Line: 3, Message: "- line 3 deleted", Severity: "warning"},
+				{Line: 3, Message: "- line 3 deleted", Severity: "warning"},
+			},
+		},
+		{
 			name:   "mark no buffer is safe",
 			hasBuf: false,
 			unstaged: []diffEntry{
