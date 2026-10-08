@@ -1,0 +1,5 @@
+module autocomplete-harness
+
+go 1.25
+
+require github.com/yuin/gopher-lua v1.1.2

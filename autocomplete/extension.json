@@ -1,0 +1,20 @@
+{
+  "id": "tcode.autocomplete",
+  "name": "Autocomplete",
+  "version": "1.0.0",
+  "activation": ["onStartup"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "tcode.autocomplete.complete",
+        "title": "Complete word from buffer",
+        "script": "main.lua",
+        "fn": "complete"
+      }
+    ],
+    "keybindings": [
+      { "key": "alt+space", "command": "tcode.autocomplete.complete" }
+    ],
+    "hooks": []
+  }
+}

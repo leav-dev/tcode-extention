@@ -44,6 +44,7 @@ from this repo directly.
 | [angular8-lint](angular8-lint/) | `tcode.angular8lint` | **Angular 8 Lint**: flags post-v8 syntax (standalone, signals, native control flow, `input()`/`output()`, `@defer`) as `error` |
 | [angular21-lint](angular21-lint/) | `tcode.angular21lint` | **Angular 21 Lint**: flags legacy patterns (`NgModule`, `@Input`/`@Output`, `*ngIf`/`*ngFor`, View Engine) as `warning`/`error` |
 | [data-lint](data-lint/) | `tcode.datalint` | **Data Lint**: syntax + structure for YAML/JSON/XML (duplicate keys as `warning`, broken syntax as `error`) |
+| [autocomplete](autocomplete/) | `tcode.autocomplete` | **Autocomplete**: buffer-word completion (`alt+space`), longest common extension or candidate list |
 
 The linter trio replaces the former unified Code Linter; the editor **merges** the markers of every extension (per-provider diagnostics). Each extension is its own git repo with its README and manifest.
 
