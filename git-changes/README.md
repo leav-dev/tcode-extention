@@ -5,8 +5,9 @@ Extensión para tcode que muestra información de cambios de git en la barra de 
 ## Características
 
 - **Status bar**: Shows branch plus file counts (S = staged, U = unstaged, ? = untracked) and added/deleted lines. Commit subject, author, date and hash are never shown.
-- **Gutter**: Marca líneas agregadas (`i` = info), borradas (`?` = warning) y modificadas (`~` = info)
-- **Auto-actualización**: Se actualiza automáticamente al guardar el buffer
+- **Gutter**: Marks added lines (`+` = info), deleted lines (`-` = warning) and modified lines (`~` = info), each with its 1-indexed line number
+- **Toggle**: Show gutter marks on first call, clear them on the second
+- **Auto-update**: Se actualiza automáticamente al guardar el buffer
 
 ## Instalación
 
@@ -22,6 +23,7 @@ tcode --install-extension <path>/tcode-extentions/git-changes
 |---------|-------------|------------|
 | `tcode.gitchanges.status` | Muestra resumen en barra de estado | `alt+shift+g` |
 | `tcode.gitchanges.mark` | Marca líneas con cambios en gutter | `alt+shift+m` |
+| `tcode.gitchanges.toggle` | Shows marks on first call, clears on second | `alt+shift+t` |
 
 ### Hooks
 
@@ -43,8 +45,14 @@ If the editor does not expose the branch, no scope prefix is shown.
 Commit subject, author, date and hash are intentionally omitted.
 
 **Gutter:**
-- `i` (info): Línea agregada o modificada
-- `?` (warning): Línea borrada
+- `+ line 12 added` (info): Línea agregada
+- `- line 3 deleted` (warning): Línea borrada
+- `~ line 7 modified` (info): Línea modificada
+
+All gutter messages include the 1-indexed line number. Calling
+`tcode.gitchanges.toggle` (`alt+shift+t`) shows the marks on the first
+call and clears them on the second. With no active buffer or an empty
+diff the toggle is a safe no-op (never raises).
 
 ## Dependencias
 

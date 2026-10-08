@@ -76,21 +76,28 @@ function status()
   tcode.statusBar.setSection("tcode.gitchanges", summary)
 end
 
--- mark marca las líneas con cambios en el gutter usando diagnostics.
--- Las líneas agregadas se marcan con severity "info" (i en el gutter).
--- Las líneas borradas se marcan con severity "warning" (? en el gutter).
+-- Toggle state for gutter marks. False = hidden, true = visible.
+-- toggle() shows on first call and clears on second.
+local visible = false
+
+-- mark shows changed lines in the gutter using diagnostics.
+-- Added lines use severity "info" (+ in the gutter).
+-- Deleted lines use severity "warning" (- in the gutter).
+-- Modified lines use severity "info" (~ in the gutter).
+-- Every message includes the 1-indexed line number in English:
+-- "+ line 12 added", "~ line 7 modified", "- line 3 deleted".
 function mark()
   local path = tcode.buffer()
   if not path then
     return
   end
 
-  -- Obtener diff unstaged
+  -- Unstaged diff
   local unstaged_diff = tcode.git.file_diff(path, false)
-  -- Obtener diff staged
+  -- Staged diff
   local staged_diff = tcode.git.file_diff(path, true)
 
-  -- Combinar diffs
+  -- Combine diffs
   local all_diffs = {}
   for _, d in ipairs(unstaged_diff or {}) do
     table.insert(all_diffs, d)
@@ -101,33 +108,51 @@ function mark()
 
   if #all_diffs == 0 then
     tcode.diagnostics.clear()
+    visible = false
     return
   end
 
-  -- Convertir a diagnostics
+  -- Convert to diagnostics
   local diags = {}
   for _, d in ipairs(all_diffs) do
     local severity = "info"
     local marker = "+"
+    local kind = d.type
     if d.type == "deleted" then
       severity = "warning"
       marker = "-"
     elseif d.type == "modified" then
       severity = "info"
       marker = "~"
+    else
+      severity = "info"
+      marker = "+"
+      kind = "added"
     end
 
     table.insert(diags, {
       line = d.line,
-      message = marker .. " line " .. d.type,
+      message = marker .. " line " .. d.line .. " " .. kind,
       severity = severity
     })
   end
 
   tcode.diagnostics.set(diags)
+  visible = true
 end
 
--- all ejecuta status y mark juntos (útil para keybinding único).
+-- toggle shows gutter marks on first call and clears them on second.
+-- Safe with no active buffer or empty diff: never raises.
+function toggle()
+  if visible then
+    tcode.diagnostics.clear()
+    visible = false
+  else
+    mark()
+  end
+end
+
+-- all runs status and mark together (useful for a single keybinding).
 function all()
   status()
   mark()
