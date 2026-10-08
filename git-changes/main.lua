@@ -39,55 +39,41 @@ local function fileSummary(git)
   return total_files .. " files (" .. file_summary .. "), " .. line_summary .. " lines"
 end
 
--- status muestra un resumen de cambios de git en la barra de estado, en su
--- propia sección (tcode.statusBar.setSection) para no pisar a las demás
--- extensiones ni a los mensajes del editor.
--- Se ejecuta al guardar el buffer (hook onDidSaveBuffer) o con alt+shift+g.
+-- status shows a git summary in the status bar, in its
+-- own section (tcode.statusBar.setSection) without overlapping other
+-- extensions or editor messages.
+-- Runs on buffer save (hook onDidSaveBuffer) or with alt+shift+g.
+-- Format is branch scope plus working-tree state only: no commit
+-- subject, author, date or hash. Examples:
+-- "[main]: clean working tree"
+-- "[feat]: 3 files (1 S, 2 U), +15 -8 lines"
+-- "clean working tree" (older editor without branch)
 function status()
   local path = tcode.buffer()
   if not path then
-    tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: no active buffer")
+    tcode.statusBar.setSection("tcode.gitchanges", "no active buffer")
     return
   end
 
   local git = tcode.git.status()
   if not git then
-    tcode.statusBar.setSection("tcode.gitchanges", "Git Changes: not a git repository")
+    tcode.statusBar.setSection("tcode.gitchanges", "not a git repository")
     return
   end
 
-  -- Branch + commit encadenados al scope. Informative: faltan en editores
-  -- viejos (nil) o cuando no se pudieron determinar (""): cada segmento
-  -- ausente se omite sin romper.
-  local scope = "Git Changes"
-  local where = {}
+  -- Branch scope only. Missing in old editors (nil) or when it could
+  -- not be determined (""): then no scope prefix is shown.
+  local scope = ""
   if git.branch ~= nil and git.branch ~= "" then
-    where[#where + 1] = git.branch
-  end
-  if git.commit_hash ~= nil and git.commit_hash ~= "" then
-    where[#where + 1] = git.commit_hash
-  end
-  if #where > 0 then
-    scope = scope .. " [" .. table.concat(where, " ") .. "]"
+    scope = "[" .. git.branch .. "]"
   end
 
-  local detail = ""
-  if git.commit_subject ~= nil and git.commit_subject ~= "" then
-    detail = git.commit_subject
-    local by = {}
-    if git.commit_author ~= nil and git.commit_author ~= "" then
-      by[#by + 1] = git.commit_author
-    end
-    if git.commit_date ~= nil and git.commit_date ~= "" then
-      by[#by + 1] = git.commit_date
-    end
-    if #by > 0 then
-      detail = detail .. " (" .. table.concat(by, ", ") .. ")"
-    end
-    detail = detail .. " | "
+  local summary = fileSummary(git)
+  if scope ~= "" then
+    summary = scope .. ": " .. summary
   end
 
-  tcode.statusBar.setSection("tcode.gitchanges", scope .. ": " .. detail .. fileSummary(git))
+  tcode.statusBar.setSection("tcode.gitchanges", summary)
 end
 
 -- mark marca las líneas con cambios en el gutter usando diagnostics.

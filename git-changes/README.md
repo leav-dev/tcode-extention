@@ -4,7 +4,7 @@ Extensión para tcode que muestra información de cambios de git en la barra de 
 
 ## Características
 
-- **Barra de estado**: Muestra rama + último commit (hash, subject, autor, fecha), cantidad de archivos con cambios (S = staged, U = unstaged, ? = untracked) y líneas agregadas/borradas
+- **Status bar**: Shows branch plus file counts (S = staged, U = unstaged, ? = untracked) and added/deleted lines. Commit subject, author, date and hash are never shown.
 - **Gutter**: Marca líneas agregadas (`i` = info), borradas (`?` = warning) y modificadas (`~` = info)
 - **Auto-actualización**: Se actualiza automáticamente al guardar el buffer
 
@@ -29,17 +29,18 @@ tcode --install-extension <path>/tcode-extentions/git-changes
 
 ## Formato de mensajes
 
-**Barra de estado:**
+**Status bar:**
 ```
-Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | 3 files (1 S, 2 U), +15 -8 lines
-Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | clean working tree
-Git Changes [main]: clean working tree          # repo sin commits
-Git Changes: clean working tree                # editor viejo sin rama ni commit
-Git Changes: not a git repository
+[main]: clean working tree
+[feat]: 3 files (1 S, 2 U), +15 -8 lines
+clean working tree                # older editor without branch
+no active buffer
+not a git repository
 ```
 
-En detached HEAD se muestra el SHA corto (`Git Changes [a1b2c3d]: ...`).
-Si el editor no expone rama o commit, cada segmento ausente se omite.
+Detached HEAD shows the short SHA as branch (`[a1b2c3d]: ...`).
+If the editor does not expose the branch, no scope prefix is shown.
+Commit subject, author, date and hash are intentionally omitted.
 
 **Gutter:**
 - `i` (info): Línea agregada o modificada

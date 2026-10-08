@@ -75,6 +75,7 @@ func run(tc testCase) (actual string, called bool, err error) {
 				t.RawSetString(key, lua.LString(*v))
 			}
 		}
+		
 		opt("branch", tc.git.branch)
 		opt("commit_hash", tc.git.commitHash)
 		opt("commit_subject", tc.git.commitSubject)
@@ -131,7 +132,7 @@ func main() {
 			name:   "branch clean tree",
 			hasBuf: true,
 			git:    gitMock{hasGit: true, branch: str("main")},
-			want:   "Git Changes [main]: clean working tree",
+			want:   "[main]: clean working tree",
 		},
 		{
 			name:   "branch with staged and unstaged",
@@ -139,77 +140,77 @@ func main() {
 			git: gitMock{hasGit: true, branch: str("feat"),
 				staged: []string{"a.go"}, unstaged: []string{"b.go", "c.go"},
 				added: 15, deleted: 8},
-			want: "Git Changes [feat]: 3 files (1 S, 2 U), +15 -8 lines",
+			want: "[feat]: 3 files (1 S, 2 U), +15 -8 lines",
 		},
 		{
 			name:   "branch with untracked only",
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str("main"),
 				untracked: []string{"new.txt"}},
-			want: "Git Changes [main]: 1 files (1 ?), +0 -0 lines",
+			want: "[main]: 1 files (1 ?), +0 -0 lines",
 		},
 		{
 			name:   "detached HEAD shows short SHA",
 			hasBuf: true,
 			git:    gitMock{hasGit: true, branch: str("a1b2c3d")},
-			want:   "Git Changes [a1b2c3d]: clean working tree",
+			want:   "[a1b2c3d]: clean working tree",
 		},
 		{
 			name:   "no branch field stays branchless",
 			hasBuf: true,
 			git:    gitMock{hasGit: true, branch: nil},
-			want:   "Git Changes: clean working tree",
+			want:   "clean working tree",
 		},
 		{
 			name:   "empty branch stays branchless",
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str(""),
 				unstaged: []string{"b.go"}, added: 2, deleted: 1},
-			want: "Git Changes: 1 files (1 U), +2 -1 lines",
+			want: "1 files (1 U), +2 -1 lines",
 		},
 		{
 			name:   "no active buffer",
 			hasBuf: false,
 			git:    gitMock{hasGit: true, branch: str("main")},
-			want:   "Git Changes: no active buffer",
+			want:   "no active buffer",
 		},
 		{
 			name:   "not a git repository",
 			hasBuf: true,
 			git:    gitMock{hasGit: false},
-			want:   "Git Changes: not a git repository",
+			want:   "not a git repository",
 		},
 		{
-			name:   "status with commit",
+			name:   "commit fields are ignored with changes",
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str("main"),
 				commitHash: str("a1b2c3d"), commitSubject: str("Fix login"),
 				commitAuthor: str("Ada"), commitDate: str("2026-10-01"),
 				unstaged: []string{"b.go"}, added: 3, deleted: 1},
-			want: "Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | 1 files (1 U), +3 -1 lines",
+			want: "[main]: 1 files (1 U), +3 -1 lines",
 		},
 		{
-			name:   "status with commit clean tree",
+			name:   "commit fields are ignored clean tree",
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str("main"),
 				commitHash: str("a1b2c3d"), commitSubject: str("Fix login"),
 				commitAuthor: str("Ada"), commitDate: str("2026-10-01")},
-			want: "Git Changes [main a1b2c3d]: Fix login (Ada, 2026-10-01) | clean working tree",
+			want: "[main]: clean working tree",
 		},
 		{
-			name:   "status subject without author date",
+			name:   "subject without author date is ignored",
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str("main"),
 				commitHash: str("a1b2c3d"), commitSubject: str("Fix login")},
-			want: "Git Changes [main a1b2c3d]: Fix login | clean working tree",
+			want: "[main]: clean working tree",
 		},
 		{
-			name:   "status empty hash keeps branch only",
+			name:   "empty hash keeps branch only",
 			hasBuf: true,
 			git: gitMock{hasGit: true, branch: str("main"),
 				commitHash: str(""), commitSubject: str("Fix login"),
 				commitAuthor: str("Ada"), commitDate: str("2026-10-01")},
-			want: "Git Changes [main]: Fix login (Ada, 2026-10-01) | clean working tree",
+			want: "[main]: clean working tree",
 		},
 	}
 
