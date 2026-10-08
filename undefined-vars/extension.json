@@ -1,7 +1,7 @@
 {
   "id": "tcode.undefinedvars",
   "name": "Undefined Variables",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "activation": [
     "onStartup"
   ],

@@ -133,6 +133,9 @@ func main() {
 		{name: "py dictcompr", path: "a.py", content: "items = []\nd = {k: v for k, v in items}\n"},
 		{name: "py generator", path: "a.py", content: "items = []\ns = sum(x for x in items)\n"},
 		{name: "py regular loop", path: "a.py", content: "items = []\nfor i in items:\n    print(i)\n"},
+		{name: "py dunder file", path: "a.py", content: "x = __file__\n"},
+		{name: "py dunder name main", path: "a.py", content: "if __name__ == \"__main__\":\n    print(__name__)\n"},
+		{name: "py dunder still undef", path: "a.py", content: "print(nope)\n", want: []string{"1:warning:undefined 'nope'"}},
 	}
 	failures := 0
 	for _, tc := range cases {

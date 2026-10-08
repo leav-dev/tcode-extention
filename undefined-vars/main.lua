@@ -46,7 +46,7 @@ local function langTable(lang)
     return {
       lineComment = "#", blockComment = false,
       keywords = set("and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield"),
-      builtins = set("True False None len range print str int float bool list dict set tuple type isinstance enumerate zip map filter sorted sum min max abs any all open input repr format round divmod hash id object property classmethod staticmethod super self Exception ValueError TypeError KeyError IndexError NameError RuntimeError"),
+      builtins = set("True False None len range print str int float bool list dict set tuple type isinstance enumerate zip map filter sorted sum min max abs any all open input repr format round divmod hash id object property classmethod staticmethod super self Exception ValueError TypeError KeyError IndexError NameError RuntimeError __name__ __doc__ __package__ __loader__ __spec__ __file__ __cached__ __builtins__ __debug__ __import__ __build_class__"),
     }
   end
   return nil
