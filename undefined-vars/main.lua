@@ -39,7 +39,7 @@ local function langTable(lang)
   elseif lang == "ts" then -- Angular rides on ts rules.
     return {
       lineComment = "//", blockComment = { "/*", "*/" },
-      keywords = set("break case catch class const continue debugger default delete do else enum export extends finally for function if import in instanceof let new of return super switch this throw try typeof var void while with yield async await from as static get set type interface implements readonly abstract namespace declare is keyof infer"),
+      keywords = set("break case catch class const continue debugger default delete do else enum export extends finally for function if import in instanceof let new of return super switch this throw try typeof var void while with yield async await from as static get set type interface implements readonly abstract namespace declare is keyof infer private public protected override accessor"),
       builtins = set("undefined null true false NaN Infinity console window document process require module exports globalThis fetch JSON Math Object Array String Number Boolean Symbol Function Promise Error Date RegExp Map Set WeakMap WeakSet Proxy Reflect parseInt parseFloat isNaN setTimeout setInterval clearTimeout clearInterval localStorage any unknown never string number boolean object Record Partial Readonly"),
     }
   elseif lang == "py" then
