@@ -796,6 +796,242 @@ local function analyzeScope(toks, cfg)
     return j + 1
   end
 
+  -- collectThisMembers pre-scans class members so `this.name` (js/ts)
+  -- and `self.name` (py) can be checked. Without it every `this.x`
+  -- was silently skipped and a typo like `this.coutn` never warned.
+  -- Members: field/method names at class-body level, constructor param
+  -- properties (`constructor(private svc)` defines `this.svc`), py `def`
+  -- names, and dynamic assignments (`this.x = ...` / `self.x = ...`).
+  -- Also returns the class-body token ranges (js/ts) and whether any
+  -- class statement exists (py has no brace bodies): `this` outside a
+  -- class (plain functions, object literals) is unknown context and is
+  -- never flagged, so only in-class member access warns.
+  local function collectThisMembers(toksArg)
+    local members = {}
+    local ranges = {}
+    local hasClass = false
+    local mods = { private = true, public = true, protected = true,
+      readonly = true, static = true, abstract = true, declare = true,
+      override = true, accessor = true, async = true }
+    local function isIdArg(j)
+      local t = toksArg[j]
+      return t and t.t == "id"
+    end
+    local function isSymArg(j, ch)
+      local t = toksArg[j]
+      return t and t.t == "sym" and t.w == ch
+    end
+    -- Dynamic assignments: this.x = ... (anywhere, order-independent).
+    local m = #toksArg
+    local j = 1
+    while j <= m do
+      local t = toksArg[j]
+      if t.t == "id" and (t.w == "this" or t.w == "self")
+        and isSymArg(j + 1, ".") and isIdArg(j + 2) then
+        local nm = toksArg[j + 2].w
+        if isSymArg(j + 3, "=") then
+          local nx = toksArg[j + 4]
+          if not (nx and nx.t == "sym" and nx.w == ">") then
+            members[nm] = true -- `=` but not `=>`
+          end
+        end
+      end
+      j = j + 1
+    end
+    -- Py methods are callable as `self.name`, so every `def` name counts
+    -- as a member (file scope: no indentation tracking in this script).
+    if cfg.lang == "py" then
+      local d = 1
+      while d <= m do
+        local dt = toksArg[d]
+        if dt.t == "id" and dt.w == "def" and isIdArg(d + 1) then
+          members[toksArg[d + 1].w] = true
+        end
+        d = d + 1
+      end
+    end
+    -- skipDecl advances past a member's trailing signature so params,
+    -- generics and types never read as member names (they are not
+    -- this-members). Starts after the member-name index nk; isCtor
+    -- enables the constructor param-property scan inside parens.
+    -- Only ()/[] nest: `<`/`>` stay untracked so a comparison initializer
+    -- still ends at `;`, while a `>` at depth 0 ends generics/return
+    -- types. `{` always stops (bodies/initializers run the main loop
+    -- with needMember consumed, so their ids never become members).
+    -- `=>` is never a stopper. Returns the stopper for reprocessing.
+    local function skipDecl(nk, isCtor)
+      local d = 0
+      local q = nk + 1
+      while toksArg[q] do
+        local t2 = toksArg[q]
+        if t2.t == "sym" then
+          if t2.w == "(" or t2.w == "[" then
+            d = d + 1
+          elseif t2.w == ")" or t2.w == "]" then
+            if d == 0 then return q end
+            d = d - 1
+          elseif t2.w == ">" then
+            local pv = toksArg[q - 1]
+            if pv and pv.t == "sym" and pv.w == "=" then
+              -- `=>`: neither closer nor stopper
+            elseif d == 0 then
+              return q
+            end
+          elseif d == 0 and (t2.w == "{" or t2.w == "}"
+            or t2.w == ";" or t2.w == "=") then
+            return q
+          end
+        elseif t2.t == "nl" and d == 0 then
+          return q
+        end
+        -- Constructor param properties live inside the paren group.
+        if isCtor and t2.t == "id" and mods[t2.w] and d > 0 then
+          if isIdArg(q + 1) and not cfg.keywords[toksArg[q + 1].w] then
+            members[toksArg[q + 1].w] = true
+          end
+        end
+        q = q + 1
+      end
+      return q
+    end
+    -- Class-body members: track `{` depth and whether each level is a
+    -- class body. needMember marks declaration starts (body open, `;`,
+    -- newline, `}` back at class level): only the first id there names
+    -- a member, so params/types/initializers never leak in as members.
+    -- Method bodies are deeper and never leak in.
+    local depth = 0
+    local classAt = {}
+    local bodyStack = {}
+    local pendingClass = false
+    local classParen = 0
+    local needMember = false
+    j = 1
+    while j <= m do
+      local t = toksArg[j]
+      if t.t == "id" and t.w == "class"
+        and not (toksArg[j - 1] and toksArg[j - 1].t == "sym"
+          and toksArg[j - 1].w == ".") then
+        -- `obj.class` is a property named class, not a declaration.
+        pendingClass = true
+        hasClass = true
+        classParen = 0
+        j = j + 1
+      elseif pendingClass and t.t == "sym"
+        and (t.w == "(" or t.w == "[" or t.w == "<") then
+        -- Heritage groups: `extends M({...})`. A `{` in here is not the
+        -- body, so it must not consume the pending class.
+        classParen = classParen + 1
+        j = j + 1
+      elseif pendingClass and t.t == "sym"
+        and (t.w == ")" or t.w == "]" or t.w == ">") then
+        -- A `>` right after `=` is the `=>` arrow, not a closer.
+        if not (t.w == ">" and toksArg[j - 1] and toksArg[j - 1].t == "sym"
+          and toksArg[j - 1].w == "=") then
+          classParen = math.max(classParen - 1, 0)
+        end
+        j = j + 1
+      elseif t.t == "sym" and t.w == "{" then
+        depth = depth + 1
+        if pendingClass and classParen == 0 then
+          classAt[depth] = true
+          bodyStack[#bodyStack + 1] = { depth = depth, s = j }
+          pendingClass = false
+        else
+          classAt[depth] = false
+        end
+        needMember = true
+        j = j + 1
+      elseif t.t == "sym" and t.w == "}" then
+        local top = bodyStack[#bodyStack]
+        if top and top.depth == depth then
+          ranges[#ranges + 1] = { s = top.s, e = j }
+          bodyStack[#bodyStack] = nil
+        end
+        classAt[depth] = nil
+        depth = math.max(depth - 1, 0)
+        if classAt[depth] then needMember = true end
+        j = j + 1
+      elseif t.t == "id" and depth > 0 and classAt[depth] and needMember then
+        -- Declaration start: skip modifiers, take one name, then skip
+        -- the whole signature so only the name becomes a member.
+        local k = j
+        while toksArg[k] and toksArg[k].t == "id" and mods[toksArg[k].w] do
+          k = k + 1
+        end
+        local nt = toksArg[k]
+        if nt and nt.t == "id" then
+          local nw = nt.w
+          local nameIdx = k
+          if nw == "get" or nw == "set" then
+            if isIdArg(k + 1) and not cfg.keywords[toksArg[k + 1].w] then
+              members[toksArg[k + 1].w] = true
+              nameIdx = k + 1
+            else
+              nameIdx = nil
+            end
+          elseif cfg.keywords[nw] then
+            nameIdx = nil
+          else
+            members[nw] = true
+          end
+          needMember = false
+          if nameIdx then
+            j = skipDecl(nameIdx, nw == "constructor")
+          else
+            j = k + 1
+          end
+        else
+          -- Lone modifier (e.g. `static { ... }` block): reprocess the
+          -- token so braces keep depth/ranges in sync.
+          j = k
+        end
+      elseif t.t == "sym" and t.w == "(" and depth > 0 and classAt[depth] then
+        -- Balanced group at class level: only decorator arguments
+        -- (`@Dec(...)`) can stand here; skip it so the decorated name
+        -- below still reads as the member.
+        local d4 = 1
+        j = j + 1
+        while toksArg[j] and d4 > 0 do
+          local pt = toksArg[j]
+          if pt.t == "sym" then
+            if pt.w == "(" then d4 = d4 + 1
+            elseif pt.w == ")" then d4 = d4 - 1
+            end
+          end
+          j = j + 1
+        end
+        needMember = true
+      elseif t.t == "sym" and t.w == ";" then
+        needMember = true
+        j = j + 1
+      elseif t.t == "nl" then
+        needMember = true
+        j = j + 1
+      else
+        j = j + 1
+      end
+    end
+    return members, ranges, hasClass
+  end
+
+  local thisMembers, classRanges, hasClass = nil, nil, false
+  if cfg.lang == "js" or cfg.lang == "ts" or cfg.lang == "py" then
+    thisMembers, classRanges, hasClass = collectThisMembers(toks)
+  end
+
+  -- inClass gates the this./self. check to class context (js/ts brace
+  -- ranges; py file-level: no indentation tracking, so any class
+  -- statement in the file enables it).
+  local function inClass(idx)
+    if cfg.lang == "py" then return hasClass end
+    if classRanges then
+      for _, r in ipairs(classRanges) do
+        if idx >= r.s and idx <= r.e then return true end
+      end
+    end
+    return false
+  end
+
   if cfg.lang == "go" then
     preScanPackageLevel(toks)
     if tcode.dir_files then
@@ -832,6 +1068,12 @@ local function analyzeScope(toks, cfg)
         end
       elseif cfg.builtins[w] then
         if isSym(i + 1, ".") then
+          -- py `self.name` is checked against the class pre-scan;
+          -- every other builtin chain (console.log, JSON.x) is skipped.
+          if cfg.lang == "py" and w == "self" and isId(i + 2)
+            and inClass(i) and thisMembers and not thisMembers[toks[i + 2].w] then
+            findings[#findings + 1] = { line = toks[i + 2].line, msg = "undefined 'self." .. toks[i + 2].w .. "'" }
+          end
           i = i + 1
           while isSym(i, ".") and isId(i + 1) do
             i = i + 2
@@ -843,7 +1085,18 @@ local function analyzeScope(toks, cfg)
         -- go x := ; js/ts {key: v} or annotation: not a usage
         i = i + 1
       elseif isSym(i - 1, ".") then
-        -- member selector after an expression (fn().prop, arr[i].prop)
+        -- Member after a dot. `this.name` / `self.name` IS checked
+        -- against the class pre-scan; anything else (fn().prop,
+        -- arr[i].prop, obj.prop) is still just a property, not a var.
+        do
+          local prev2 = toks[i - 2]
+          local isThis = prev2 and prev2.t == "id"
+            and (prev2.w == "this" or prev2.w == "self")
+          if isThis and (cfg.lang == "js" or cfg.lang == "ts" or cfg.lang == "py")
+            and inClass(i) and thisMembers and not thisMembers[w] then
+            findings[#findings + 1] = { line = tok.line, msg = "undefined '" .. prev2.w .. "." .. w .. "'" }
+          end
+        end
         i = i + 1
       elseif isSym(i + 1, ",") then
         -- multi-target decl (go a, b := ; py a, b =) vs call args (fn(a, b))

@@ -37,7 +37,15 @@ analyzed by this extension (no scope rules for them in v1).
   functions/classes/arrows, import bindings; py any assignment, `def`/`class`,
   `import`/`from`, lambda/for/with-as params.
 - Selector/member access checks only the base (`pkg.Fn` → `pkg`); properties
-  after calls (`get().prop`) are not variables.
+  after calls (`get().prop`) are not variables. Exception: `this.name`
+  (js/ts) and `self.name` (py) are checked against class members
+  (fields, methods, constructor param properties like
+  `constructor(private svc)`, and `this.x = ...` assignments); an unknown
+  member warns as `undefined 'this.name'` (e.g. a typo such as
+  `this.coutn`). The check runs only inside a class (py: file-level when
+  any class exists); `this` in plain functions or object literals is
+  unknown context and stays silent. `extends M({...})` heritage groups
+  and `.class` properties don't confuse the class scan.
 - py uses a single file scope (no indentation); forward references in py can
   warn. TS generics (`<T>`, constraints, generic classes/methods/arrows)
   are supported; JSX markup in `.tsx` still flags (no tag awareness).
