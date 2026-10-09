@@ -1,7 +1,7 @@
 {
   "id": "tcode.autocomplete",
   "name": "Autocomplete",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "activation": ["onStartup"],
   "contributes": {
     "commands": [
@@ -13,8 +13,12 @@
       }
     ],
     "keybindings": [
-      { "key": "alt+space", "command": "tcode.autocomplete.complete" }
+      { "key": "ctrl+space", "command": "tcode.autocomplete.complete" }
     ],
-    "hooks": []
+    "hooks": [],
+    "suggest": {
+      "script": "main.lua",
+      "fn": "suggest"
+    }
   }
 }
