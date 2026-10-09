@@ -19,6 +19,9 @@ type testCase struct {
 	hasCursor bool
 	curLine   float64
 	curCol    float64
+	// files mocks tcode.read_file (relpath -> content) and tcode.dir_files
+	// (listed as {path, content}); nil means "nothing out there".
+	files map[string]string
 	// Expectations. An empty wantInsert means "no insert expected".
 	wantInsert string
 	// Substrings that must appear in the joined messages ("" = no message expected).
@@ -76,6 +79,30 @@ func run(tc testCase) (result, error) {
 		res.messages = append(res.messages, L.CheckString(1))
 		return 0
 	}))
+	L.SetField(tcode, "read_file", L.NewFunction(func(L *lua.LState) int {
+		rel := L.CheckString(1)
+		if c, ok := tc.files[rel]; ok {
+			t := L.NewTable()
+			L.SetField(t, "content", lua.LString(c))
+			L.Push(t)
+			return 1
+		}
+		L.Push(lua.LNil)
+		return 1
+	}))
+	L.SetField(tcode, "dir_files", L.NewFunction(func(L *lua.LState) int {
+		t := L.NewTable()
+		i := 1
+		for p, c := range tc.files {
+			it := L.NewTable()
+			L.SetField(it, "path", lua.LString(p))
+			L.SetField(it, "content", lua.LString(c))
+			t.RawSetInt(i, it)
+			i++
+		}
+		L.Push(t)
+		return 1
+	}))
 	if tc.hasCursor {
 		curLine, curCol := tc.curLine, tc.curCol
 		L.SetField(tcode, "cursor", L.NewFunction(func(L *lua.LState) int {
@@ -108,102 +135,102 @@ func main() {
 			curCol:    1,
 		},
 		{
-			name:      "missing cursor",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foo foobar\nfoo",
-			hasCursor: false,
+			name:           "missing cursor",
+			hasBuffer:      true,
+			path:           "a.txt",
+			content:        "foo foobar\nfoo",
+			hasCursor:      false,
 			wantMessageSub: "cursor",
 		},
 		{
-			name:      "empty prefix",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "hello world\n",
-			hasCursor: true,
-			curLine:   1,
-			curCol:    1,
+			name:           "empty prefix",
+			hasBuffer:      true,
+			path:           "a.txt",
+			content:        "hello world\n",
+			hasCursor:      true,
+			curLine:        1,
+			curCol:         1,
 			wantMessageSub: "no word prefix",
 		},
 		{
-			name:      "no candidates",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foo bar\nxyz",
-			hasCursor: true,
-			curLine:   2,
-			curCol:    4,
+			name:           "no candidates",
+			hasBuffer:      true,
+			path:           "a.txt",
+			content:        "foo bar\nxyz",
+			hasCursor:      true,
+			curLine:        2,
+			curCol:         4,
 			wantMessageSub: "no candidates",
 		},
 		{
-			name:      "single candidate",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foobar baz\nfoo",
-			hasCursor: true,
-			curLine:   2,
-			curCol:    4,
+			name:       "single candidate",
+			hasBuffer:  true,
+			path:       "a.txt",
+			content:    "foobar baz\nfoo",
+			hasCursor:  true,
+			curLine:    2,
+			curCol:     4,
 			wantInsert: "bar",
 		},
 		{
-			name:      "common extension",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foobar foobaz\nfoo",
-			hasCursor: true,
-			curLine:   2,
-			curCol:    4,
+			name:       "common extension",
+			hasBuffer:  true,
+			path:       "a.txt",
+			content:    "foobar foobaz\nfoo",
+			hasCursor:  true,
+			curLine:    2,
+			curCol:     4,
 			wantInsert: "ba",
 		},
 		{
-			name:      "divergent list",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foobar fizz\nf",
-			hasCursor: true,
-			curLine:   2,
-			curCol:    2,
+			name:           "divergent list",
+			hasBuffer:      true,
+			path:           "a.txt",
+			content:        "foobar fizz\nf",
+			hasCursor:      true,
+			curLine:        2,
+			curCol:         2,
 			wantMessageSub: "2 candidates",
 		},
 		{
-			name:      "dedupe",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foobar foobar foobar\nfoo",
-			hasCursor: true,
-			curLine:   2,
-			curCol:    4,
+			name:       "dedupe",
+			hasBuffer:  true,
+			path:       "a.txt",
+			content:    "foobar foobar foobar\nfoo",
+			hasCursor:  true,
+			curLine:    2,
+			curCol:     4,
 			wantInsert: "bar",
 		},
 		{
-			name:      "frequency ordering",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "test test test team text\nte",
-			hasCursor: true,
-			curLine:   2,
-			curCol:    3,
+			name:           "frequency ordering",
+			hasBuffer:      true,
+			path:           "a.txt",
+			content:        "test test test team text\nte",
+			hasCursor:      true,
+			curLine:        2,
+			curCol:         3,
 			wantMessageSub: "3 candidates",
 			wantOrder:      "test, team, text",
 		},
 		{
-			name:      "fractional line",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foobar foobaz\nfoo",
-			hasCursor: true,
-			curLine:   1.5,
-			curCol:    4,
+			name:           "fractional line",
+			hasBuffer:      true,
+			path:           "a.txt",
+			content:        "foobar foobaz\nfoo",
+			hasCursor:      true,
+			curLine:        1.5,
+			curCol:         4,
 			wantMessageSub: "invalid cursor position",
 		},
 		{
-			name:      "fractional col",
-			hasBuffer: true,
-			path:      "a.txt",
-			content:   "foobar foobaz\nfoo",
-			hasCursor: true,
-			curLine:   2,
-			curCol:    2.5,
+			name:           "fractional col",
+			hasBuffer:      true,
+			path:           "a.txt",
+			content:        "foobar foobaz\nfoo",
+			hasCursor:      true,
+			curLine:        2,
+			curCol:         2.5,
 			wantMessageSub: "invalid cursor position",
 		},
 	}
@@ -287,6 +314,7 @@ type suggestCase struct {
 	hasCursor bool
 	curLine   float64
 	curCol    float64
+	files     map[string]string
 	// want lists the exact expected return, in order; nil means "expect
 	// an empty table". Purity (no insert/message) is always enforced.
 	want []string
@@ -328,6 +356,30 @@ func runSuggest(tc suggestCase) ([]string, bool, error) {
 	L.SetField(tcode, "message", L.NewFunction(func(L *lua.LState) int {
 		messaged = true
 		return 0
+	}))
+	L.SetField(tcode, "read_file", L.NewFunction(func(L *lua.LState) int {
+		rel := L.CheckString(1)
+		if c, ok := tc.files[rel]; ok {
+			t := L.NewTable()
+			L.SetField(t, "content", lua.LString(c))
+			L.Push(t)
+			return 1
+		}
+		L.Push(lua.LNil)
+		return 1
+	}))
+	L.SetField(tcode, "dir_files", L.NewFunction(func(L *lua.LState) int {
+		t := L.NewTable()
+		i := 1
+		for p, c := range tc.files {
+			it := L.NewTable()
+			L.SetField(it, "path", lua.LString(p))
+			L.SetField(it, "content", lua.LString(c))
+			t.RawSetInt(i, it)
+			i++
+		}
+		L.Push(t)
+		return 1
 	}))
 	if tc.hasCursor {
 		curLine, curCol := tc.curLine, tc.curCol
@@ -451,6 +503,47 @@ func runSuggestCases() int {
 			curLine:   2,
 			curCol:    3,
 			want:      suggestCapWant(),
+		},
+		{
+			name:      "suggest import words",
+			hasBuffer: true,
+			path:      "a.ts",
+			content:   "import { Helper } from './help';\nHel",
+			hasCursor: true,
+			curLine:   2,
+			curCol:    4,
+			files:     map[string]string{"./help.ts": "export class HelperBase {}\nexport function HelperFunc() {}"},
+			want:      []string{"Helper", "HelperBase", "HelperFunc"},
+		},
+		{
+			name:      "suggest this members",
+			hasBuffer: true,
+			path:      "a.ts",
+			content:   "class A {\n  count = 0;\n  go() {\n    return this.cou;\n  }\n}",
+			hasCursor: true,
+			curLine:   4,
+			curCol:    20,
+			want:      []string{"count"},
+		},
+		{
+			name:      "suggest self members",
+			hasBuffer: true,
+			path:      "a.py",
+			content:   "class A:\n    def bar(self):\n        pass\n    def foo(self):\n        return self.ba",
+			hasCursor: true,
+			curLine:   5,
+			curCol:    23,
+			want:      []string{"bar"},
+		},
+		{
+			name:      "suggest fuzzy",
+			hasBuffer: true,
+			path:      "a.txt",
+			content:   "foobar\nfbr",
+			hasCursor: true,
+			curLine:   2,
+			curCol:    4,
+			want:      []string{"foobar"},
 		},
 	}
 

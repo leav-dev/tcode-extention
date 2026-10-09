@@ -33,9 +33,15 @@ The script is stateless (no completion cycle state) and validates that the
 cursor line/col are integers, rejecting fractional or NaN positions with
 `Autocomplete: invalid cursor position`. It never touches diagnostics.
 
-`suggest()` shares the candidate ranking with `complete()` (frequency then
-alphabetical) but is pure: it returns at most 32 words, never inserts or
-messages. Empty table means no suggestion. Editors without
+`suggest()` ranks best-first in tiers: `this.`/`self.` members (in that
+context), same-file prefix words (frequency, alphabetical), relative-import
+words (`tcode.read_file`, max 8 attempts; Go siblings via `tcode.dir_files`),
+then fuzzy subsequence matches. At most 32 words, pure: never inserts or
+messages. Empty table means no suggestion. Member collection is heuristic
+(assignments, ctor properties, `def`s, declaration-like lines at class
+depth) and may over-approximate; the ghost shows dimmed first and `Tab`
+confirms, so a stray name costs a glance. `complete()` shares the pool
+(its longest-common-extension flow is unchanged). Editors without
 `contributes.suggest` support ignore the manifest key and keep working with
 `ctrl+space` only.
 
